@@ -372,6 +372,11 @@ exit(int status)
   p->state = ZOMBIE;
 
   release(&wait_lock);
+//*****************************OMRI ADDED FOR PRINTING PROCESS TABLE**************************************************
+//    for(p = proc; p < &proc[NPROC]; p++){
+//        printf("process pid:%d, name:%s\n",p->pid,p->name);
+//    }
+//********************************************************************************************************************
 
   // Jump into the scheduler, never to return.
   sched();
@@ -653,4 +658,24 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+int
+pause_system(int seconds)
+{
+    return -1;
+}
+int
+kill_system(void)
+{
+    struct proc *p;
+    printf("Entering kill_system function *******************");
+    for(p = proc; p < &proc[NPROC]; p++){
+        acquire(&p->lock);
+        if((p->pid > 3) || (p->pid < 1)){// init process pid is 1, shell process pids are 2,3 - from a print OMRI made in the "exit" function
+            printf("process pid is: %d",p->pid);
+            kill(p->pid);
+       }
+        release(&p->lock);
+    }
+    return -1;
 }

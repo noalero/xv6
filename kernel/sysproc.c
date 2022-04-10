@@ -83,6 +83,18 @@ sys_kill(void)
   return kill(pid);
 }
 
+uint64
+sys_killsys(void)
+{
+    printf("Entering sys_killsys function **************************");
+    return kill_system(); // We Need to check something else?
+}
+
+uint64
+sys_pausesys(void)
+{
+    return -999;
+}
 // return how many clock tick interrupts have occurred
 // since start.
 uint64

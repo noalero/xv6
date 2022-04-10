@@ -30,6 +30,8 @@ main()
     virtio_disk_init(); // emulated hard disk
     userinit();      // first user process
     __sync_synchronize();
+
+
     started = 1;
   } else {
     while(started == 0)
@@ -40,6 +42,7 @@ main()
     trapinithart();   // install kernel trap vector
     plicinithart();   // ask PLIC for device interrupts
   }
+
 
   scheduler();        
 }
