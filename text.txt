@@ -1,0 +1,31 @@
+int
+pause_system(int seconds)
+{
+    struct proc *p;
+    uint ticks0 = ticks;
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock); //When should we release [&p->lock] ?
+      if (p->state == RUNNING || p->state == RUNNABLE){
+        p->chan = &ticks;
+        p->state = RUNNABLE;
+      }
+      release(&p->lock);
+    }
+    acquire(&tickslock);
+    while (ticks - ticks0 < seconds){ ;; }
+    release(&tickslock);
+    sched();
+    return 0; // Find out what [int] this function returns
+}
+
+uint64
+sys_pausesys(void)
+{
+  int seconds = 1;
+  if(argint(1, &seconds) < 0){ 
+    return -1;
+  }
+  else {
+    return pause_system((uint64)seconds);
+  }
+}
