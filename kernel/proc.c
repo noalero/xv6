@@ -662,8 +662,9 @@ procdump(void)
 int
 pause_system(int seconds)
 {
-    return -1;
+  return -1;
 }
+
 int
 kill_system(void)
 {
