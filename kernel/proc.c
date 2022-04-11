@@ -659,11 +659,31 @@ procdump(void)
     printf("\n");
   }
 }
+
 int
 pause_system(int seconds)
 {
-  return -1;
+    struct proc *p;
+    uint ticks0 = ticks;
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock); //When should we release [&p->lock] ?
+      if (p->state == RUNNING || p->state == RUNNABLE){
+        p->chan = &ticks;
+        p->state = RUNNABLE;
+      }
+      release(&p->lock);
+    }
+    acquire(&tickslock);
+    while (ticks - ticks0 < seconds){ ;; }
+    release(&tickslock);
+    sched();
+    return 0; // Find out what [int] this function returns
 }
+// int
+// pause_system(int seconds)
+// {
+//   return -1;
+// }
 
 int
 kill_system(void)

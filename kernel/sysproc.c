@@ -90,11 +90,23 @@ sys_killsys(void)
     return kill_system(); // We Need to check something else?
 }
 
+// uint64
+// sys_pausesys(void)
+// {
+//     return -999;
+// }
 uint64
 sys_pausesys(void)
 {
-    return -999;
+  int seconds = 1;
+  if(argint(0, &seconds) < 0){ 
+    return -1;
+  }
+  else {
+    return pause_system((uint64)seconds);
+  }
 }
+
 // return how many clock tick interrupts have occurred
 // since start.
 uint64
