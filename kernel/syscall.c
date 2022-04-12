@@ -104,8 +104,8 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
-extern uint64 sys_pausesys(void);//maybe change void to int
-extern uint64 sys_killsys(void);
+extern uint64 sys_pause_system(void);//maybe change void to int
+extern uint64 sys_kill_system(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -129,8 +129,8 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
-[SYS_pausesys] sys_pausesys,
-[SYS_killsys] sys_killsys,
+[SYS_pause_system] sys_pause_system,
+[SYS_kill_system] sys_kill_system,
 };
 
 void
@@ -148,4 +148,40 @@ syscall(void)
     p->trapframe->a0 = -1;
   }
 }
-//bbbbbbbaaaaaaaa
+
+///////////////////////////////////////////////// TESTING EXAMPLE////////////////////////////////////////////////////
+/* void pause_system_dem(int interval, int pause_seconds, int loop_size) {
+    int pid = sys_getpid();
+    for (int i = 0; i < loop_size; i++) {
+        if (i % interval == 0 && pid == sys_getpid()) {
+            printf("pause system %d/%d completed.\n", i, loop_size);
+        }
+        if (i == loop_size / 2) {
+            pause_system(pause_seconds);
+        }
+    }
+    printf("\n");
+}
+
+void kill_system_dem(int interval, int loop_size) {
+    int pid = sys_getpid();
+    for (int i = 0; i < loop_size; i++) {
+        if (i % interval == 0 && pid == sys_getpid()) {
+            printf("kill system %d/%d completed.\n", i, loop_size);
+        }
+        if (i == loop_size / 2) {
+            kill_system();
+        }
+    }
+    printf("\n");
+}
+
+int
+main(int argc, char *argv[])
+{
+    pause_system_dem(10, 3, 100);
+    kill_system_dem(10, 100);
+    exit(0);
+    return 0;
+}
+*/

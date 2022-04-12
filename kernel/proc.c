@@ -663,13 +663,30 @@ procdump(void)
 int
 pause_system(int seconds)
 {
-    struct proc *p;
+  struct  proc *p;
+  int pid = myproc()->pid;
+  uint ticks0 = ticks;
+  acquire(&tickslock);
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->pid == pid){
+      while (ticks - ticks0 < seconds){
+        yield();
+      }
+    }
+    release(&p->lock);
+  }
+  release(&tickslock);
+  return 0;
+
+    /* struct proc *p;
     uint ticks0 = ticks;
     for(p = proc; p < &proc[NPROC]; p++){
       acquire(&p->lock); //When should we release [&p->lock] ?
       if (p->state == RUNNING || p->state == RUNNABLE){
-        p->chan = &ticks;
-        p->state = RUNNABLE; //Change, change bit?
+        p->chan = &ticks; 
+        p->state = RUNNABLE; 
+        yield();
       }
       release(&p->lock);
     }
@@ -677,28 +694,26 @@ pause_system(int seconds)
     while (ticks - ticks0 < seconds){ ;; }
     release(&tickslock);
     sched();
-    return 0; // Find out what [int] this function returns
+    return 0; // Find out what [int] this function returns */
 
-    // yield -> if runnable
 }
-// int
-// pause_system(int seconds)
-// {
-//   return -1;
-// }
 
 int
 kill_system(void)
 {
-    struct proc *p;
-    printf("Entering kill_system function *******************");
-    for(p = proc; p < &proc[NPROC]; p++){
-        acquire(&p->lock);
-        if((p->pid > 3) || (p->pid < 1)){// init process pid is 1, shell process pids are 2,3 - from a print OMRI made in the "exit" function
-            printf("process pid is: %d",p->pid);
-            kill(p->pid);
-       }
-        release(&p->lock);
-    }
-    return -1;
+  struct proc *p;
+  printf("Entering kill_system function *******************");
+  for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if((p->pid > 3) || (p->pid < 1)){// init process pid is 1, shell process pids are 2,3 - from a print OMRI made in the "exit" function
+          printf("process pid is: %d",p->pid);
+          p->killed = 1; //kill(p->pid);
+          if(p->state == SLEEPING){ //added
+            p->state = RUNNABLE;
+          }
+          release(&p->lock);// added
+      }
+      release(&p->lock);
+  }
+  return -1;
 }

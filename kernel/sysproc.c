@@ -84,14 +84,14 @@ sys_kill(void)
 }
 
 uint64
-sys_killsys(void)
+sys_kill_system(void)
 {
     kill_system();
     return 0;
 }
 
 uint64
-sys_pausesys(void)
+sys_pause_system(void)
 {
   int seconds;
   if(argint(0, &seconds) < 0){ 
