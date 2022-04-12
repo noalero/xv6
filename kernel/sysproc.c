@@ -86,25 +86,19 @@ sys_kill(void)
 uint64
 sys_killsys(void)
 {
-    printf("Entering sys_killsys function **************************");
-    return kill_system(); // We Need to check something else?
+    kill_system();
+    return 0;
 }
 
-// uint64
-// sys_pausesys(void)
-// {
-//     return -999;
-// }
 uint64
 sys_pausesys(void)
 {
-  int seconds = 1;
+  int seconds;
   if(argint(0, &seconds) < 0){ 
     return -1;
   }
-  else {
-    return pause_system((uint64)seconds);
-  }
+  pause_system(seconds);
+  return 0;
 }
 
 // return how many clock tick interrupts have occurred

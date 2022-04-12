@@ -669,7 +669,7 @@ pause_system(int seconds)
       acquire(&p->lock); //When should we release [&p->lock] ?
       if (p->state == RUNNING || p->state == RUNNABLE){
         p->chan = &ticks;
-        p->state = RUNNABLE;
+        p->state = RUNNABLE; //Change, change bit?
       }
       release(&p->lock);
     }
@@ -678,6 +678,8 @@ pause_system(int seconds)
     release(&tickslock);
     sched();
     return 0; // Find out what [int] this function returns
+
+    // yield -> if runnable
 }
 // int
 // pause_system(int seconds)
