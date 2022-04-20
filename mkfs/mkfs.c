@@ -290,7 +290,7 @@ iappend(uint inum, void *xp, int n)
         p += n1;
     }
     din.size = xint(off);
-    winode(inum, &din);//bllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll
+    winode(inum, &din);
 }
 
 void
