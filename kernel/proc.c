@@ -438,6 +438,50 @@ wait(uint64 addr)
   }
 }
 
+//Maybe we need to change the functionality to cause the pause be more accurate - right now it is not exactly for x seconds
+void checkAndPause(int processesCount)
+{
+    struct proc *p;
+    uint curr_time = 0;
+    intr_on();
+
+    for(p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+        if (p->should_pause == 1) {
+            release(&p->lock);
+            acquire(&tickslock);
+            uint ticks0 = ticks;
+            release(&tickslock);
+            curr_time = ticks0;
+            while (curr_time - ticks0 < p->pause_left_time/(processesCount/6)) {
+                acquire(&tickslock);
+                curr_time = ticks;
+                release(&tickslock);
+                //printf("Time passed:%d\n", curr_time - ticks0);
+            }
+            acquire(&p->lock);
+            p->pause_left_time = 0;
+            p->should_pause = 0;
+        }
+        release(&p->lock);
+    }
+}
+
+int initPause(void)
+{
+    struct proc *p;
+    int processesCount=1;
+    // Omri added - initialize all shouldPause flags to zero - is it necessary?
+    for(p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+        p->should_pause = 0;
+        p->pause_left_time=0;
+        release(&p->lock);
+        processesCount++;
+    }
+    return processesCount;
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -451,49 +495,14 @@ scheduler(void)
   printf("proc.c RR\n");
   struct proc *p;
   struct cpu *c = mycpu();
-  int processesCount=1;
-  // Omri added - initialize all shouldPause flags to zero - is it necessary?
-    for(p = proc; p < &proc[NPROC]; p++) {
-        acquire(&p->lock);
-        p->should_pause = 0;
-        p->pause_left_time=0;
-        release(&p->lock);
-        processesCount++;
-    }
-  // ****************************************************
-
-
+  int processesCount;
+  processesCount = initPause();
   c->proc = 0;
+
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
-    intr_on();
-    //Maybe we need to change the functionality to cause the pause be more accurate - right now it is not exactly for x seconds
-    // Pause functionality - start  *******************
-      uint curr_time = 0;
       intr_on();
-
-      for(p = proc; p < &proc[NPROC]; p++) {
-          acquire(&p->lock);
-          if (p->should_pause == 1) {
-              release(&p->lock);
-              acquire(&tickslock);
-              uint ticks0 = ticks;
-              release(&tickslock);
-              curr_time = ticks0;
-              while (curr_time - ticks0 < p->pause_left_time / (processesCount/6)) {
-                  acquire(&tickslock);
-                  curr_time = ticks;
-                  release(&tickslock);
-                 // printf("Time passed:%d\n", curr_time - ticks0);
-              }
-              acquire(&p->lock);
-              p->pause_left_time = 0;
-              p->should_pause = 0;
-          }
-          release(&p->lock);
-      }
-      // Pause functionality - end *********************
-
+      checkAndPause(processesCount);
       for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
@@ -829,5 +838,5 @@ kill_system(void)
       }
       release(&p->lock);
   }
-  return -1;
+  return 0; // should be 0?
 }
