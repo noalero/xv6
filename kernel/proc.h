@@ -95,9 +95,10 @@ struct proc {
   int mean_ticks;
   int last_ticks;
   int last_runnable_time;
+  int should_pause;             // Omri added - a flag that tells whether the system should pause right now or not
+  int pause_left_time;           // Omri added - the time left that all system should be in pause state - in ticks units
 
-
-  // wait_lock must be held when using this:
+    // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
 
   // these are private to the process, so p->lock need not be held.
