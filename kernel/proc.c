@@ -803,45 +803,6 @@ procdump(void)
   }
 }
 
-//int
-//pause_system(int seconds)
-//{
-//  struct  proc *p;
-//  int pid = myproc()->pid;
-//  acquire(&tickslock);
-//  uint ticks0 = ticks;
-//  for(p = proc; p < &proc[NPROC]; p++){
-//    acquire(&p->lock);
-//    if((p->pid > 3) || (p->pid < 1)){
-//      if(p->pid == pid){
-//        while (ticks - ticks0 < seconds){
-//          //??????????????????????///
-//          if(myproc()->killed){
-//            release(&tickslock);
-//            release(&p->lock);
-//            return -1;
-//          }
-//          //??????????????????????///
-//          yield();
-//        }
-//      }
-//      release(&p->lock);
-//    }
-//     release(&tickslock);
-//  }
-//   return 0;
-//}
-
-
-
-
-//??????????????????????/// inside while - Noa's code - i think an interrupt check this case before the function so we can ignore such situation
-//                    if(myproc()->killed){
-//                        release(&tickslock);
-//                        release(&p->lock);
-//                        return -1;
-//                    }
-//??????????????????????///
 int
 pause_system(int seconds)
 {
