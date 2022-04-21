@@ -25,6 +25,7 @@ extern char trampoline[]; // trampoline.S
 // memory model when using p->parent.
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
+int rate = 5;
 
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
@@ -241,6 +242,8 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
+  p->mean_ticks = 0;
+  p->last_ticks = 0;
 
   p->state = RUNNABLE;
 
@@ -294,6 +297,9 @@ fork(void)
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
+
+  np->mean_ticks = 0;
+  np->last_ticks = 0;
 
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
@@ -468,6 +474,73 @@ scheduler(void)
     }
   }
 }
+
+
+void schedulerSJF(void){
+  struct proc *p;
+  struct cpu *c = mycpu();
+  c->proc = 0;
+  int min = __INT_MAX__;
+
+  for(;;){
+     intr_on();
+
+    // Find the process with minimal <mean_ticks>
+     for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE) {
+        if(p->mean_ticks < min) { 
+          c->proc = p;
+          min = p->mean_ticks;
+        }
+      }
+      release(&p->lock);
+     }
+
+    p = c->proc;
+    acquire(&p->lock);
+    p->state = RUNNING;
+    acquire(&tickslock);
+    int ticks0 = ticks;
+    swtch(&c->context, &p->context);
+    p->last_ticks = ticks - ticks0; // is that the CPU burst?
+    release(&tickslock);
+    p->mean_ticks = ((10 - rate) * (p->mean_ticks + p->last_ticks) * rate) / 10;
+    c->proc = 0;
+    release(&p->lock);
+  }
+}
+
+
+void schedulerFCFS(void){
+  struct proc *p;
+  struct cpu *c = mycpu();
+  c->proc = 0;
+  int min = __INT_MAX__;
+
+  for(;;){
+     intr_on();
+
+    // Find the process with minimal <last_runnable_time>
+     for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->last_runnable_time < min) {
+          min = p->last_runnable_time;
+          c->proc = p;
+        }
+      release(&p->lock);
+     }
+    
+    p = c->proc;
+    acquire(&p->lock);
+    p->state = RUNNING;
+    c->proc = p;
+    swtch(&c->context, &p->context);
+    c->proc = 0;
+    release(&p->lock);
+  }
+}
+
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -665,19 +738,29 @@ pause_system(int seconds)
 {
   struct  proc *p;
   int pid = myproc()->pid;
-  uint ticks0 = ticks;
   acquire(&tickslock);
+  uint ticks0 = ticks;
   for(p = proc; p < &proc[NPROC]; p++){
     acquire(&p->lock);
-    if(p->pid == pid){
-      while (ticks - ticks0 < seconds){
-        yield();
+    if((p->pid > 3) || (p->pid < 1)){
+      if(p->pid == pid){
+        while (ticks - ticks0 < seconds){
+          //??????????????????????///
+          if(myproc()->killed){
+            release(&tickslock);
+            release(&p->lock);
+            return -1;
+          }
+          //??????????????????????///
+          yield();
+        } 
       }
+      release(&p->lock);
     }
-    release(&p->lock);
+     release(&tickslock);
   }
-  release(&tickslock);
-  return 0;
+   return 0;
+}
 
     /* struct proc *p;
     uint ticks0 = ticks;
@@ -696,7 +779,7 @@ pause_system(int seconds)
     sched();
     return 0; // Find out what [int] this function returns */
 
-}
+
 
 int
 kill_system(void)
@@ -708,10 +791,6 @@ kill_system(void)
       if((p->pid > 3) || (p->pid < 1)){// init process pid is 1, shell process pids are 2,3 - from a print OMRI made in the "exit" function
           printf("process pid is: %d",p->pid);
           p->killed = 1; //kill(p->pid);
-          if(p->state == SLEEPING){ //added
-            p->state = RUNNABLE;
-          }
-          release(&p->lock);// added
       }
       release(&p->lock);
   }
