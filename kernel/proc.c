@@ -448,6 +448,7 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
+  printf("proc.c RR\n");
   struct proc *p;
   struct cpu *c = mycpu();
   
@@ -477,6 +478,7 @@ scheduler(void)
 
 
 void schedulerSJF(void){
+  printf("proc.c SJF\n");
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
@@ -513,6 +515,7 @@ void schedulerSJF(void){
 
 
 void schedulerFCFS(void){
+  printf("proc.c FCFS\n");
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
