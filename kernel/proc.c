@@ -451,25 +451,27 @@ scheduler(void)
   printf("proc.c RR\n");
   struct proc *p;
   struct cpu *c = mycpu();
-
+  int processesCount=1;
   // Omri added - initialize all shouldPause flags to zero - is it necessary?
     for(p = proc; p < &proc[NPROC]; p++) {
         acquire(&p->lock);
         p->should_pause = 0;
         p->pause_left_time=0;
         release(&p->lock);
+        processesCount++;
     }
   // ****************************************************
 
 
   c->proc = 0;
-  //TODO: Improve the pause time accuracy, we should make the calculation be based on the current number of processes in Runnable state
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
+    //Maybe we need to change the functionality to cause the pause be more accurate - right now it is not exactly for x seconds
     // Pause functionality - start  *******************
       uint curr_time = 0;
       intr_on();
+
       for(p = proc; p < &proc[NPROC]; p++) {
           acquire(&p->lock);
           if (p->should_pause == 1) {
@@ -478,11 +480,11 @@ scheduler(void)
               uint ticks0 = ticks;
               release(&tickslock);
               curr_time = ticks0;
-              while (curr_time - ticks0 < p->pause_left_time) {
+              while (curr_time - ticks0 < p->pause_left_time / (processesCount/6)) {
                   acquire(&tickslock);
                   curr_time = ticks;
                   release(&tickslock);
-                  printf("Time passed:%d\n", curr_time - ticks0);
+                 // printf("Time passed:%d\n", curr_time - ticks0);
               }
               acquire(&p->lock);
               p->pause_left_time = 0;
@@ -845,7 +847,7 @@ pause_system(int seconds)
 {
     struct  proc *  curr_proc = myproc();
     acquire(&curr_proc->lock);
-    curr_proc->pause_left_time = seconds * 10;
+    curr_proc->pause_left_time = seconds * 100;
     curr_proc->should_pause = 1;
     release(&curr_proc->lock);
     yield();
@@ -855,12 +857,13 @@ pause_system(int seconds)
 int
 kill_system(void)
 {
+  //Omri- I checked and the function is always gets into pid=0 -> we need to understand why
   struct proc *p;
-  printf("Entering kill_system function *******************\n");
+  //printf("Entering kill_system function *******************\n");
   for(p = proc; p < &proc[NPROC]; p++){
       acquire(&p->lock);
       if((p->pid > 3) || (p->pid < 1)){// init process pid is 1, shell process pids are 2,3 - from a print OMRI made in the "exit" function
-          printf("process pid is: %d\n",p->pid);
+          //printf("process pid is: %d\n",p->pid);
           p->killed = 1; //kill(p->pid);
       }
       release(&p->lock);
