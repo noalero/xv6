@@ -31,7 +31,7 @@ main()
     userinit();      // first user process
     __sync_synchronize();
 
-
+    //fsafsafsfasfsafas
     started = 1;
   } else {
     while(started == 0)
