@@ -483,31 +483,43 @@ void schedulerSJF(void){
   struct cpu *c = mycpu();
   c->proc = 0;
   int min = __INT_MAX__;
+  struct proc *current_proc = proc;
+  printf("initializing variables\n");
+  
 
   for(;;){
+    printf("for(;;) \n");
      intr_on();
+     printf("intr_on\n");
 
     // Find the process with minimal <mean_ticks>
      for(p = proc; p < &proc[NPROC]; p++) {
+       printf("for(p = proc; p < &proc[NPROC]; p++)\n");
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
         if(p->mean_ticks < min) { 
-          c->proc = p;
+          printf("p->mean_ticks < min\n");
+          current_proc = p;
           min = p->mean_ticks;
         }
       }
       release(&p->lock);
-     }
+    }
 
-    p = c->proc;
+    printf("<current_proc> pid is %d\n", current_proc->pid);
+    p = current_proc;
+    printf(" <p> pid is %d\n", p->pid);
     acquire(&p->lock);
+    printf("p->lock \n");
     p->state = RUNNING;
+    printf(" <p> state is %s\n", p->state);
+    c->proc = p;
     acquire(&tickslock);
     int ticks0 = ticks;
     swtch(&c->context, &p->context);
     p->last_ticks = ticks - ticks0; // is that the CPU burst?
     release(&tickslock);
-    p->mean_ticks = ((10 - rate) * (p->mean_ticks + p->last_ticks) * rate) / 10;
+    p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * rate) / 10;
     c->proc = 0;
     release(&p->lock);
   }
