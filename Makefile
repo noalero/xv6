@@ -165,7 +165,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 	else echo "-s -p $(GDBPORT)"; fi)
 
 ifndef CPUS
-CPUS := 3
+CPUS := 1
 endif
 ### change back to three ###
 

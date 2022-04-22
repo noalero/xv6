@@ -246,7 +246,11 @@ userinit(void)
   p->last_ticks = 0;
 
   p->state = RUNNABLE;
-
+    //Added for FCFS algorithm
+    acquire(&tickslock);
+    p->last_runnable_time = ticks;
+    release(&tickslock);
+    //************************
   release(&p->lock);
 }
 
@@ -319,7 +323,13 @@ fork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
-  release(&np->lock);
+    //Added for FCFS algorithm
+    acquire(&tickslock);
+    p->last_runnable_time = ticks;
+    release(&tickslock);
+    //************************
+
+    release(&np->lock);
 
   return pid;
 }
@@ -520,105 +530,90 @@ scheduler(void)
       release(&p->lock);
     }
   }
+}
+//The shell should get commands like in the RR scheduler?
+//How should we check this?
+void schedulerSJF(void){
+  printf("**********Entering SJF scheduler in proc.c file******\n");
+  struct proc *p;
+  struct cpu *c = mycpu();
+  c->proc = 0;
+  int min = __INT_MAX__;
+  struct proc *current_proc = proc;
+  int processesCount =  initPause();
+
+  for(;;){
+     intr_on();
+     checkAndPause(processesCount);
+
+    // Find the process with minimal <mean_ticks>
+     for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE) {
+        if(p->mean_ticks < min) {
+          current_proc = p;
+          min = p->mean_ticks;
+        }
+      }
+      release(&p->lock);
+    }
+
+    p = current_proc;
+    acquire(&p->lock);
+    p->state = RUNNING;
+    c->proc = p;
+    acquire(&tickslock);
+    int ticks0 = ticks;
+    release(&tickslock);
+    swtch(&c->context, &p->context);
+    acquire(&tickslock);
+    p->last_ticks = ticks - ticks0; // is that the CPU burst?
+    release(&tickslock);
+    p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * rate) / 10;
+    c->proc = 0;
+    release(&p->lock);
   }
+}
 
+//We need to have support - evert time a process becaome runnable his status should be updated
+//Whenever we become RUNNABLE we should change the "last_runnable_time" param
+//It seems like its not doing thw swtch - need to check why
+void schedulerFCFS(void){
+  printf("********** Entering to FCFS scheduler *************\n");
+  struct proc *p;
+  struct cpu *c = mycpu();
+  c->proc = 0;
+  int min = __INT_MAX__;
+  int processesCount =  initPause();
 
-//
-//void schedulerSJF(void){
-//  printf("proc.c SJF\n");
-//  struct proc *p;
-//  struct cpu *c = mycpu();
-//  c->proc = 0;
-//  int min = __INT_MAX__;
-//  struct proc *current_proc = proc;
-//  printf("initializing variables\n");
-//
-//// Omri added - initialize all shouldPause flags to zero - is it necessary?
-//for(p = proc; p < &proc[NPROC]; p++) {
-//acquire(&p->lock);
-//p->should_pause = 0;
-//p->pause_left_time=0;
-//release(&p->lock);
-//}
-//    // ****************************************************
-//
-//  for(;;){
-//    printf("for(;;) \n");
-//     intr_on();
-//     printf("intr_on\n");
-//
-//    // Find the process with minimal <mean_ticks>
-//     for(p = proc; p < &proc[NPROC]; p++) {
-//       printf("for(p = proc; p < &proc[NPROC]; p++)\n");
-//      acquire(&p->lock);
-//      if(p->state == RUNNABLE) {
-//        if(p->mean_ticks < min) {
-//          printf("p->mean_ticks < min\n");
-//          current_proc = p;
-//          min = p->mean_ticks;
-//        }
-//      }
-//      release(&p->lock);
-//    }
-//
-//    printf("<current_proc> pid is %d\n", current_proc->pid);
-//    p = current_proc;
-//    printf(" <p> pid is %d\n", p->pid);
-//    acquire(&p->lock);
-//    printf("p->lock \n");
-//    p->state = RUNNING;
-//    printf(" <p> state is %s\n", p->state);
-//    c->proc = p;
-//    acquire(&tickslock);
-//    int ticks0 = ticks;
-//    swtch(&c->context, &p->context);
-//    p->last_ticks = ticks - ticks0; // is that the CPU burst?
-//    release(&tickslock);
-//    p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * rate) / 10;
-//    c->proc = 0;
-//    release(&p->lock);
-//  }
-//}
-//
-//
-//void schedulerFCFS(void){
-//  printf("proc.c FCFS\n");
-//  struct proc *p;
-//  struct cpu *c = mycpu();
-//  c->proc = 0;
-//  int min = __INT_MAX__;
-//
-//    // Omri added - initialize all shouldPause flags to zero - is it necessary?
-//for(p = proc; p < &proc[NPROC]; p++) {
-//acquire(&p->lock);
-//p->should_pause = 0;
-//p->pause_left_time=0;
-//release(&p->lock);
-//}
-//    // ****************************************************
-//
-//  for(;;){
-//     intr_on();
-//
-//    // Find the process with minimal <last_runnable_time>
-//     for(p = proc; p < &proc[NPROC]; p++) {
-//      acquire(&p->lock);
-//      if(p->last_runnable_time < min) {
-//          min = p->last_runnable_time;
-//          c->proc = p;
-//        }
-//      release(&p->lock);
-//     }
-//
-//    p = c->proc;
-//    acquire(&p->lock);
-//    p->state = RUNNING;
-//    c->proc = p;
-//    swtch(&c->context, &p->context);
-//    c->proc = 0;
-//    release(&p->lock);
-//  }
-//}
+    for(;;){
+     intr_on();
+     checkAndPause(processesCount);
+     min = __INT_MAX__;
+     // Find the process with minimal <last_runnable_time>
+     for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+         printf("p->last_runnable_time %d\n",p->last_runnable_time );
+         if(p->last_runnable_time < min) {
+          min = p->last_runnable_time;
+          c->proc = p;
+        }
+      release(&p->lock);
+     }
+    printf("p->pid after proc for loop %d\n",p->pid );
+    p = c->proc;
+    acquire(&p->lock);
+    p->state = RUNNING;
+    c->proc = p;
+
+    printf("p->pid before swtch %d\n",p->pid );
+    swtch(&c->context, &p->context);
+    printf("p->pid after swtch %d\n",p->pid );
+
+    c->proc = 0;
+    release(&p->lock);
+  }
+}
 
 
 // Switch to scheduler.  Must hold only p->lock
@@ -655,6 +650,11 @@ yield(void)
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
+  //Added for FCFS algorithm
+  acquire(&tickslock);
+  p->last_runnable_time = ticks;
+  release(&tickslock);
+  //************************
   sched();
   release(&p->lock);
 }
@@ -723,6 +723,11 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
+        //Added for FCFS
+        acquire(&tickslock);
+        p->last_runnable_time = ticks;
+        release(&tickslock);
+        //*******************
       }
       release(&p->lock);
     }
@@ -744,6 +749,11 @@ kill(int pid)
       if(p->state == SLEEPING){
         // Wake process from sleep().
         p->state = RUNNABLE;
+          //Added for FCFS algorithm
+          acquire(&tickslock);
+          p->last_runnable_time = ticks;
+          release(&tickslock);
+          //************************
       }
       release(&p->lock);
       return 0;

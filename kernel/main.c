@@ -43,21 +43,18 @@ main()
     plicinithart();   // ask PLIC for device interrupts
   }
 
-  /*#ifdef SJF
-    printf("main S J F\n");
+#ifdef SJF
     schedulerSJF();
-  #endif
+#endif
 
-  #ifdef FCFS
-    printf(" main F C F S\n");
+#ifdef FCFS
     schedulerFCFS();
-  #endif
+#endif
 
-  #ifdef DEFAULT
-    printf("main R R\n");
+#ifdef DEFAULT
     scheduler();
-  #endif
-*/
-scheduler();
+#endif
+
+//scheduler();
     
 }
