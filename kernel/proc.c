@@ -246,11 +246,9 @@ userinit(void)
   p->last_ticks = 0;
 
   p->state = RUNNABLE;
-    //Added for FCFS algorithm
-    acquire(&tickslock);
-    p->last_runnable_time = ticks;
-    release(&tickslock);
-    //************************
+  acquire(&tickslock);
+  p->last_runnable_time = ticks;
+  release(&tickslock);
   release(&p->lock);
 }
 
@@ -323,13 +321,10 @@ fork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
-    //Added for FCFS algorithm
-    acquire(&tickslock);
-    p->last_runnable_time = ticks;
-    release(&tickslock);
-    //************************
-
-    release(&np->lock);
+  acquire(&tickslock);
+  np->last_runnable_time = ticks;
+  release(&tickslock);
+  release(&np->lock);
 
   return pid;
 }
@@ -545,6 +540,7 @@ void schedulerSJF(void){
   for(;;){
      intr_on();
      checkAndPause(processesCount);
+     min = __INT_MAX__; // I think this line should be here (as in schedualerFCFS)
 
     // Find the process with minimal <mean_ticks>
      for(p = proc; p < &proc[NPROC]; p++) {
@@ -575,6 +571,10 @@ void schedulerSJF(void){
   }
 }
 
+
+
+
+
 //We need to have support - evert time a process becaome runnable his status should be updated
 //Whenever we become RUNNABLE we should change the "last_runnable_time" param
 //It seems like its not doing thw swtch - need to check why
@@ -582,36 +582,35 @@ void schedulerFCFS(void){
   printf("********** Entering to FCFS scheduler *************\n");
   struct proc *p;
   struct cpu *c = mycpu();
-  c->proc = 0;
   int min = __INT_MAX__;
-  int processesCount =  initPause();
+  int processesCount =  initPause(); // Number of processes
+  c->proc = 0;
 
     for(;;){
      intr_on();
-     checkAndPause(processesCount);
+     checkAndPause(processesCount); // Check if <pause_system> was called, and pause acordinglly
      min = __INT_MAX__;
      // Find the process with minimal <last_runnable_time>
      for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-         printf("p->last_runnable_time %d\n",p->last_runnable_time );
-         if(p->last_runnable_time < min) {
-          min = p->last_runnable_time;
-          c->proc = p;
-        }
+      acquire(&p->lock);         
+      if(p->state == RUNNABLE && p->last_runnable_time < min) {
+        min = p->last_runnable_time;
+      }
       release(&p->lock);
      }
-    printf("p->pid after proc for loop %d\n",p->pid );
-    p = c->proc;
-    acquire(&p->lock);
-    p->state = RUNNING;
-    c->proc = p;
 
-    printf("p->pid before swtch %d\n",p->pid );
-    swtch(&c->context, &p->context);
-    printf("p->pid after swtch %d\n",p->pid );
-
-    c->proc = 0;
-    release(&p->lock);
+     for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);         
+      if(p->state == RUNNABLE && p->last_runnable_time == min) {
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+        c->proc = 0;    
+        release(&p->lock);
+        break;
+      }
+      release(&p->lock);
+     }
   }
 }
 
@@ -650,11 +649,9 @@ yield(void)
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
-  //Added for FCFS algorithm
   acquire(&tickslock);
   p->last_runnable_time = ticks;
   release(&tickslock);
-  //************************
   sched();
   release(&p->lock);
 }
@@ -723,11 +720,9 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
-        //Added for FCFS
         acquire(&tickslock);
         p->last_runnable_time = ticks;
         release(&tickslock);
-        //*******************
       }
       release(&p->lock);
     }
@@ -749,11 +744,9 @@ kill(int pid)
       if(p->state == SLEEPING){
         // Wake process from sleep().
         p->state = RUNNABLE;
-          //Added for FCFS algorithm
-          acquire(&tickslock);
-          p->last_runnable_time = ticks;
-          release(&tickslock);
-          //************************
+        acquire(&tickslock);
+        p->last_runnable_time = ticks;
+        release(&tickslock);
       }
       release(&p->lock);
       return 0;
