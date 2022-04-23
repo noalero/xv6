@@ -383,11 +383,6 @@ exit(int status)
   p->state = ZOMBIE;
 
   release(&wait_lock);
-//*****************************OMRI ADDED FOR PRINTING PROCESS TABLE**************************************************
-//    for(p = proc; p < &proc[NPROC]; p++){
-//        printf("process pid:%d, name:%s\n",p->pid,p->name);
-//    }
-//********************************************************************************************************************
 
   // Jump into the scheduler, never to return.
   sched();
@@ -462,7 +457,6 @@ void checkAndPause(int processesCount)
                 acquire(&tickslock);
                 curr_time = ticks;
                 release(&tickslock);
-                //printf("Time passed:%d\n", curr_time - ticks0);
             }
             acquire(&p->lock);
             p->pause_left_time = 0;
@@ -534,7 +528,6 @@ void schedulerSJF(void){
   struct cpu *c = mycpu();
   c->proc = 0;
   int min = __INT_MAX__;
-  struct proc *current_proc = proc;
   int processesCount =  initPause();
 
   for(;;){
@@ -543,36 +536,39 @@ void schedulerSJF(void){
      min = __INT_MAX__; // I think this line should be here (as in schedualerFCFS)
 
     // Find the process with minimal <mean_ticks>
-     for(p = proc; p < &proc[NPROC]; p++) {
+    for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        if(p->mean_ticks < min) {
-          current_proc = p;
-          min = p->mean_ticks;
-        }
+      if(p->mean_ticks < min && p->state == RUNNABLE) {
+        min = p->mean_ticks;
       }
       release(&p->lock);
     }
 
-    p = current_proc;
-    acquire(&p->lock);
-    p->state = RUNNING;
-    c->proc = p;
-    acquire(&tickslock);
-    int ticks0 = ticks;
-    release(&tickslock);
-    swtch(&c->context, &p->context);
-    acquire(&tickslock);
-    p->last_ticks = ticks - ticks0; // is that the CPU burst?
-    release(&tickslock);
-    p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * rate) / 10;
-    c->proc = 0;
-    release(&p->lock);
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->mean_ticks == min && p->state == RUNNABLE) {
+        p->state = RUNNING;
+        c->proc = p;
+
+        acquire(&tickslock);
+        int ticks0 = ticks;
+        release(&tickslock);
+
+        swtch(&c->context, &p->context);
+        
+        acquire(&tickslock);
+        p->last_ticks = ticks - ticks0; // is that the CPU burst?
+        release(&tickslock);
+
+        p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * rate) / 10;
+        c->proc = 0;
+        release(&p->lock);
+        break;
+      }
+      release(&p->lock);
+    }
   }
 }
-
-
-
 
 
 //We need to have support - evert time a process becaome runnable his status should be updated
@@ -832,14 +828,17 @@ kill_system(void)
 {
   //Omri- I checked and the function is always gets into pid=0 -> we need to understand why
   struct proc *p;
-  //printf("Entering kill_system function *******************\n");
   for(p = proc; p < &proc[NPROC]; p++){
       acquire(&p->lock);
       if((p->pid > 3) || (p->pid < 1)){// init process pid is 1, shell process pids are 2,3 - from a print OMRI made in the "exit" function
-          //printf("process pid is: %d\n",p->pid);
           p->killed = 1; //kill(p->pid);
       }
       release(&p->lock);
   }
-  return 0; // should be 0?
+  return 0; 
+}
+
+void
+print_status(void)
+{
 }
