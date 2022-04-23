@@ -26,9 +26,9 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 int rate = 5;
-uint sleeping_time;
-uint runnable_time;
-uint running_time;
+uint sleeping_processes_mean = 0;
+uint runnable_processes_mean = 0;
+uint running_processes_mean = 0;
 
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
@@ -123,6 +123,12 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->last_runnable_time = 0;
+  p->mean_ticks = 0;
+  p->last_ticks = 0;
+  p->runnable_time = 0;
+  p->running_time = 0;
+  p->sleeping_time = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -168,6 +174,9 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->sleeping_time = 0;
+  p->runnable_time = 0;
+  p->running_time = 0;
 }
 
 // Create a user page table for a given process,
@@ -247,6 +256,9 @@ userinit(void)
   p->cwd = namei("/");
   p->mean_ticks = 0;
   p->last_ticks = 0;
+  p->sleeping_time = 0;
+  p->running_time = 0;
+  p->runnable_time = 0;
 
   p->state = RUNNABLE;
   acquire(&tickslock);
@@ -303,9 +315,6 @@ fork(void)
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
 
-  np->mean_ticks = 0;
-  np->last_ticks = 0;
-
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
@@ -323,10 +332,16 @@ fork(void)
   release(&wait_lock);
 
   acquire(&np->lock);
-  np->state = RUNNABLE;
+  np->mean_ticks = 0;
+  np->last_ticks = 0;
+  np->sleeping_time = 0;
+  np->runnable_time = 0;
+  np->running_time = 0;
   acquire(&tickslock);
+  np->last_time_state_changed = ticks;
   np->last_runnable_time = ticks;
   release(&tickslock);
+  np->state = RUNNABLE;
   release(&np->lock);
 
   return pid;
@@ -499,6 +514,7 @@ scheduler(void)
   struct cpu *c = mycpu();
   int processesCount;
   processesCount = initPause();
+  uint ticks0, latest_runnable_time_burst;
   c->proc = 0;
 
   for(;;){
@@ -511,6 +527,12 @@ scheduler(void)
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
+        acquire(&tickslock);
+        ticks0 = ticks;
+        release(&tickslock);
+        latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
+        p->runnable_time += latest_runnable_time_burst;
+        p->last_time_state_changed = ticks0;
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
@@ -532,6 +554,7 @@ void schedulerSJF(void){
   c->proc = 0;
   int min = __INT_MAX__;
   int processesCount =  initPause();
+  uint ticks0, latest_runnable_time_burst;
 
   for(;;){
      intr_on();
@@ -550,17 +573,18 @@ void schedulerSJF(void){
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->mean_ticks == min && p->state == RUNNABLE) {
+        acquire(&tickslock);
+        ticks0 = ticks;
+        release(&tickslock);
+        latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
+        p->runnable_time += latest_runnable_time_burst;
         p->state = RUNNING;
         c->proc = p;
-
-        acquire(&tickslock);
-        int ticks0 = ticks;
-        release(&tickslock);
 
         swtch(&c->context, &p->context);
         
         acquire(&tickslock);
-        p->last_ticks = ticks - ticks0; // is that the CPU burst?
+        p->last_ticks = ticks - ticks0; // CPU burst
         release(&tickslock);
 
         p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * rate) / 10;
@@ -574,15 +598,13 @@ void schedulerSJF(void){
 }
 
 
-//We need to have support - evert time a process becaome runnable his status should be updated
-//Whenever we become RUNNABLE we should change the "last_runnable_time" param
-//It seems like its not doing thw swtch - need to check why
 void schedulerFCFS(void){
   printf("********** Entering to FCFS scheduler *************\n");
   struct proc *p;
   struct cpu *c = mycpu();
   int min = __INT_MAX__;
   int processesCount =  initPause(); // Number of processes
+  uint ticks0, latest_runnable_time_burst;
   c->proc = 0;
 
     for(;;){
@@ -601,6 +623,12 @@ void schedulerFCFS(void){
      for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);         
       if(p->state == RUNNABLE && p->last_runnable_time == min) {
+        acquire(&tickslock);
+        ticks0 = ticks;
+        release(&tickslock);
+        latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
+        p->runnable_time += latest_runnable_time_burst;
+        p->last_time_state_changed = ticks0;
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
@@ -647,10 +675,15 @@ yield(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
-  p->state = RUNNABLE;
+  uint ticks0;
   acquire(&tickslock);
-  p->last_runnable_time = ticks;
+  ticks0 = ticks;
   release(&tickslock);
+  uint latest_running_time_burst = ticks0 - p->last_time_state_changed; // Only a process in <p->state == RUNNING> can yield
+  p->running_time += latest_running_time_burst;
+  p->last_time_state_changed = ticks0; // The <ticks> value of the time <p> entered <RUNNABLE> state
+  p->last_runnable_time = ticks0; 
+  p->state = RUNNABLE;  
   sched();
   release(&p->lock);
 }
@@ -693,6 +726,20 @@ sleep(void *chan, struct spinlock *lk)
   acquire(&p->lock);  //DOC: sleeplock1
   release(lk);
 
+  uint ticks0;
+  acquire(&tickslock);
+  ticks0 = ticks;
+  release(&tickslock);
+  uint time_since_state_changed = ticks0 - p->last_time_state_changed; 
+  if (p->state == RUNNING){
+    p->running_time += time_since_state_changed;
+  }
+  else if (p->state == RUNNABLE){ // Check if a process can sleep from <RUNNABLE> state
+    p->runnable_time += time_since_state_changed;
+  }
+  p->last_time_state_changed = ticks0;
+
+
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
@@ -718,10 +765,16 @@ wakeup(void *chan)
     if(p != myproc()){
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
-        p->state = RUNNABLE;
-        acquire(&tickslock);
-        p->last_runnable_time = ticks;
+        uint ticks0;
+        acquire (&tickslock);
+        ticks0 = ticks;
         release(&tickslock);
+        uint latest_sleeping_time_burst = ticks0 - p->last_time_state_changed; // if(p->state == SLEEPING
+        p->sleeping_time += latest_sleeping_time_burst;
+        p->last_time_state_changed = ticks0;
+        p->last_runnable_time = ticks0;
+        p->state = RUNNABLE;
+
       }
       release(&p->lock);
     }
@@ -735,6 +788,8 @@ int
 kill(int pid)
 {
   struct proc *p;
+  uint ticks0;
+  uint last_time_since_state_changed;
 
   for(p = proc; p < &proc[NPROC]; p++){
     acquire(&p->lock);
@@ -742,10 +797,14 @@ kill(int pid)
       p->killed = 1;
       if(p->state == SLEEPING){
         // Wake process from sleep().
-        p->state = RUNNABLE;
         acquire(&tickslock);
-        p->last_runnable_time = ticks;
+        ticks0 = ticks;
         release(&tickslock);
+        last_time_since_state_changed = ticks0 - p->last_time_state_changed;
+        p->sleeping_time += last_time_since_state_changed; // if(p->state == SLEEPING)
+        p->last_time_state_changed = ticks0;
+        p->last_runnable_time = ticks0;
+        p->state = RUNNABLE;
       }
       release(&p->lock);
       return 0;
