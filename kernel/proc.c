@@ -25,10 +25,24 @@ extern char trampoline[]; // trampoline.S
 // memory model when using p->parent.
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
+struct spinlock noplock;
+struct spinlock sleepinlock;
+struct spinlock runnablelock;
+struct spinlock runninglock;
 int rate = 5;
+acquire(&sleepinlock);
 uint sleeping_processes_mean = 0;
+release(&sleepinlock);
+acquire(&runnablelock);
 uint runnable_processes_mean = 0;
+release(&runnablelock);
+acquire(&runninglock);
 uint running_processes_mean = 0;
+release(&runninglock);
+acquire(&noplock);
+int num_of_proc = 0; // The number of processes in system (including processes that allready exited)
+release(&noplock);
+
 
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
@@ -123,12 +137,14 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  // Check if needed here
   p->last_runnable_time = 0;
   p->mean_ticks = 0;
   p->last_ticks = 0;
   p->runnable_time = 0;
   p->running_time = 0;
   p->sleeping_time = 0;
+  //////////////////////
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -254,6 +270,7 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
+  // Check if needed here
   p->mean_ticks = 0;
   p->last_ticks = 0;
   p->sleeping_time = 0;
@@ -338,9 +355,10 @@ fork(void)
   np->runnable_time = 0;
   np->running_time = 0;
   acquire(&tickslock);
-  np->last_time_state_changed = ticks;
-  np->last_runnable_time = ticks;
+  uint ticks0 = ticks;
   release(&tickslock);
+  np->last_time_state_changed = ticks0;
+  np->last_runnable_time = ticks0;
   np->state = RUNNABLE;
   release(&np->lock);
 
@@ -401,6 +419,25 @@ exit(int status)
   p->state = ZOMBIE;
 
   release(&wait_lock);
+
+  // Updating global variables: num_of_proc  |
+  // sleeping_processes_mean  |  runnable_processes_mean  |  running_processes_mean
+  acquire(&noplock);
+  num_of_proc ++;
+
+  acquire(&sleepinlock);
+  sleeping_processes_mean = ((sleeping_processes_mean * num_of_proc) + p->sleeping_time) / (num_of_proc + 1)
+  release(&sleepinlock);
+  acquire(&runnablelock);
+  runnable_processes_mean = ((runnable_processes_mean * num_of_proc) + p->runnable_time) / (num_of_proc + 1)
+  release(&runnablelock);
+  acquire(&runninglock);
+  running_processes_mean = ((running_processes_mean * num_of_proc) + p->running_time) / (num_of_proc + 1)
+  release(&runninglock);
+
+  release(&noplock);
+  //-----------------------------------//
+
 
   // Jump into the scheduler, never to return.
   sched();
@@ -903,4 +940,6 @@ kill_system(void)
 void
 print_status(void)
 {
+  printf("Sleeping Processes Mean is %d\n Runnable Processes Maen is %d\n Running Processes Mean is %d\n",
+   sleeping_processes_mean, runnable_processes_mean, running_processes_mean);
 }

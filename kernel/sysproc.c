@@ -104,6 +104,7 @@ sys_pause_system(void)
 uint64
 sys_print_status(void)
 {
+  print_status();
  return 0; 
 }
 

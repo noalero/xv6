@@ -87,20 +87,20 @@ struct proc {
   struct spinlock lock;
 
   // p->lock must be held when using these:
-  enum procstate state;        // Process state
-  void *chan;                  // If non-zero, sleeping on chan
-  int killed;                  // If non-zero, have been killed
-  int xstate;                  // Exit status to be returned to parent's wait
-  int pid;                     // Process ID
-  uint mean_ticks;             // SJF
-  uint last_ticks;             // SJF: number of ticks in the last CPU burst
-  uint last_runnable_time;     // FCFS: the ticks value of the last time the process became RUNNABLE
-  int should_pause;            // Omri added - a flag that tells whether the system should pause right now or not
-  int pause_left_time;         // Omri added - the time left that all system should be in pause state - in ticks units
-  uint sleeping_time;          // Total time spent in SLEEPING state
-  uint runnable_time;          // Total time spent in RUNNABLE state
-  uint running_time;           // Total time spent in RUNNING state
-  uint last_time_state_changed; // The <ticks> value at the last time <p->state> has changed
+  enum procstate state;          // Process state
+  void *chan;                    // If non-zero, sleeping on chan
+  int killed;                    // If non-zero, have been killed
+  int xstate;                    // Exit status to be returned to parent's wait
+  int pid;                       // Process ID
+  uint mean_ticks;               // SJF
+  uint last_ticks;               // SJF: number of ticks in the last CPU burst
+  uint last_runnable_time;       // FCFS: the ticks value of the last time the process became RUNNABLE
+  int should_pause;              // Omri added - a flag that tells whether the system should pause right now or not
+  int pause_left_time;           // Omri added - the time left that all system should be in pause state - in ticks units
+  uint sleeping_time;            // Noa- Total time spent in SLEEPING state
+  uint runnable_time;            // Noa- Total time spent in RUNNABLE state
+  uint running_time;             // Noa- Total time spent in RUNNING state
+  uint last_time_state_changed;  // Noa- The <ticks> value at the last time <p->state> has changed
 
     // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
