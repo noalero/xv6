@@ -26,6 +26,9 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 int rate = 5;
+uint sleeping_time;
+uint runnable_time;
+uint running_time;
 
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
