@@ -32,27 +32,35 @@ struct spinlock runninglock;
 struct spinlock ptimelock;
 struct spinlock cpu_utlock;
 int rate = 5;
-acquire(&ptimelock);
 uint program_time = 0;
-release(&ptimelock);
-acquire(&sleepinlock);
 uint sleeping_processes_mean = 0;
-release(&sleepinlock);
-acquire(&runnablelock);
 uint runnable_processes_mean = 0;
-release(&runnablelock);
-acquire(&runninglock);
 uint running_processes_mean = 0;
-release(&runninglock);
-acquire(&noplock);
 int num_of_proc = 0; // The number of processes in system (including processes that allready exited)
-release(&noplock);
-acquire(&cpu_utlock);
 int cpu_utilization = 0;
-release(&cpu_utlock);
-acquire(&stimelock);
 uint start_time = 0;
-release(&stimelock);
+
+// acquire(&ptimelock);
+// uint program_time = 0;
+// release(&ptimelock);
+// acquire(&sleepinlock);
+// uint sleeping_processes_mean = 0;
+// release(&sleepinlock);
+// acquire(&runnablelock);
+// uint runnable_processes_mean = 0;
+// release(&runnablelock);
+// acquire(&runninglock);
+// uint running_processes_mean = 0;
+// release(&runninglock);
+// acquire(&noplock);
+// int num_of_proc = 0; // The number of processes in system (including processes that allready exited)
+// release(&noplock);
+// acquire(&cpu_utlock);
+// int cpu_utilization = 0;
+// release(&cpu_utlock);
+// acquire(&stimelock);
+// uint start_time = 0;
+// release(&stimelock);
 
 
 // Allocate a page for each process's kernel stack.
@@ -81,6 +89,13 @@ procinit(void)
   release(&tickslock);
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
+  initlock(&noplock, "number_of_proc_lock");
+  initlock(&sleepinlock, "sleepin_processes_mean_lock");
+  initlock(&runnablelock, "runnable_processes_mean_lock");
+  initlock(&runninglock, "running_processes_mean_lock");
+  initlock(&ptimelock, "program_time_lock");
+  initlock(&cpu_utlock, "cpu_utilization_lock");
+
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       p->kstack = KSTACK((int) (p - proc));
@@ -150,14 +165,14 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
-  // Check if needed here
-  p->last_runnable_time = 0;
-  p->mean_ticks = 0;
-  p->last_ticks = 0;
-  p->runnable_time = 0;
-  p->running_time = 0;
-  p->sleeping_time = 0;
-  //////////////////////
+  // // Check if needed here
+  // p->last_runnable_time = 0;
+  // p->mean_ticks = 0;
+  // p->last_ticks = 0;
+  // p->runnable_time = 0;
+  // p->running_time = 0;
+  // p->sleeping_time = 0;
+  // //////////////////////
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -284,11 +299,11 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
   // Check if needed here
-  p->mean_ticks = 0;
-  p->last_ticks = 0;
-  p->sleeping_time = 0;
-  p->running_time = 0;
-  p->runnable_time = 0;
+  // p->mean_ticks = 0;
+  // p->last_ticks = 0;
+  // p->sleeping_time = 0;
+  // p->running_time = 0;
+  // p->runnable_time = 0;
 
   p->state = RUNNABLE;
   acquire(&tickslock);
@@ -355,18 +370,18 @@ fork(void)
 
   pid = np->pid;
 
-  release(&np->lock);
+  release(&np->lock);//acquire?
 
   acquire(&wait_lock);
   np->parent = p;
   release(&wait_lock);
 
   acquire(&np->lock);
-  np->mean_ticks = 0;
-  np->last_ticks = 0;
-  np->sleeping_time = 0;
-  np->runnable_time = 0;
-  np->running_time = 0;
+  // np->mean_ticks = 0;
+  // np->last_ticks = 0;
+  // np->sleeping_time = 0;
+  // np->runnable_time = 0;
+  // np->running_time = 0;
   acquire(&tickslock);
   uint ticks0 = ticks;
   release(&tickslock);
@@ -439,13 +454,13 @@ exit(int status)
   num_of_proc ++;
 
   acquire(&sleepinlock);
-  sleeping_processes_mean = ((sleeping_processes_mean * num_of_proc) + p->sleeping_time) / (num_of_proc + 1)
+  sleeping_processes_mean = ((sleeping_processes_mean * num_of_proc) + p->sleeping_time) / (num_of_proc + 1);
   release(&sleepinlock);
   acquire(&runnablelock);
-  runnable_processes_mean = ((runnable_processes_mean * num_of_proc) + p->runnable_time) / (num_of_proc + 1)
+  runnable_processes_mean = ((runnable_processes_mean * num_of_proc) + p->runnable_time) / (num_of_proc + 1);
   release(&runnablelock);
   acquire(&runninglock);
-  running_processes_mean = ((running_processes_mean * num_of_proc) + p->running_time) / (num_of_proc + 1)
+  running_processes_mean = ((running_processes_mean * num_of_proc) + p->running_time) / (num_of_proc + 1);
   release(&runninglock);
 
   release(&noplock);
@@ -458,7 +473,7 @@ exit(int status)
   program_time += p->running_time;
   release(&runninglock);
 
-  acquire(cpu_utlock);
+  acquire(&cpu_utlock);
   acquire(&tickslock);
   cpu_utilization = program_time / (ticks - start_time);
   release(&tickslock);
@@ -968,6 +983,9 @@ kill_system(void)
 void
 print_status(void)
 {
-  printf("Sleeping Processes Mean is %d\nRunnable Processes Maen is %d\nRunning Processes Mean is %d\nProgram Time is %d\nStart Time is %d\nCPU Utolization is %d\n",
-   sleeping_processes_mean, runnable_processes_mean, running_processes_mean, program_time, start_time, cpu_utilization);
+  acquire(&tickslock);
+  uint ticks0 = ticks;
+  release(&tickslock);
+  printf("Sleeping Processes Mean is %d\nRunnable Processes Maen is %d\nRunning Processes Mean is %d\nProgram Time is %d\nStart Time is %d\nCPU Utolization is %d\nTicks %d\n",
+   sleeping_processes_mean, runnable_processes_mean, running_processes_mean, program_time, start_time, cpu_utilization, ticks0);
 }

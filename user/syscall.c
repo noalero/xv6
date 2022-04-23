@@ -36,6 +36,19 @@ void kill_system_dem(int interval, int loop_size) {
 }
 
 
+void print_status_dem(int interval, int loop_size) {
+    int pid = getpid();
+    for (int i = 0; i < loop_size; i++) {
+        if (i % interval == 0 && pid == getpid()) {
+            printf("print status %d/%d completed.\n", i, loop_size);
+        }
+        if (i == loop_size / 2) {
+            print_status();
+        }
+    }
+    printf("\n");
+}
+
 void set_economic_mode_dem(int interval, int loop_size) {
     int pid = getpid();
     set_economic_mode_dem(1,loop_size);
@@ -56,5 +69,6 @@ main(int argc, char *argv[])
     //set_economic_mode_dem(10, 100);
     pause_system_dem(10, 10, 100);
     kill_system_dem(10, 100);
+    print_status_dem(10, 100);
     exit(0);
 }
