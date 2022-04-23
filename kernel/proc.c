@@ -29,7 +29,12 @@ struct spinlock noplock;
 struct spinlock sleepinlock;
 struct spinlock runnablelock;
 struct spinlock runninglock;
+struct spinlock ptimelock;
+struct spinlock cpu_utlock;
 int rate = 5;
+acquire(&ptimelock);
+uint program_time = 0;
+release(&ptimelock);
 acquire(&sleepinlock);
 uint sleeping_processes_mean = 0;
 release(&sleepinlock);
@@ -42,6 +47,12 @@ release(&runninglock);
 acquire(&noplock);
 int num_of_proc = 0; // The number of processes in system (including processes that allready exited)
 release(&noplock);
+acquire(&cpu_utlock);
+int cpu_utilization = 0;
+release(&cpu_utlock);
+acquire(&stimelock);
+uint start_time = 0;
+release(&stimelock);
 
 
 // Allocate a page for each process's kernel stack.
@@ -65,7 +76,9 @@ void
 procinit(void)
 {
   struct proc *p;
-  
+  acquire(&tickslock);
+  start_time = ticks;
+  release(&tickslock);
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
   for(p = proc; p < &proc[NPROC]; p++) {
@@ -438,6 +451,21 @@ exit(int status)
   release(&noplock);
   //-----------------------------------//
 
+  // Updating global variables: program_time | cpu_utilization
+  acquire(&ptimelock);
+
+  acquire(&runninglock);
+  program_time += p->running_time;
+  release(&runninglock);
+
+  acquire(cpu_utlock);
+  acquire(&tickslock);
+  cpu_utilization = program_time / (ticks - start_time);
+  release(&tickslock);
+  release(&cpu_utlock);
+
+  release(&ptimelock);
+  //-------------------------------------//
 
   // Jump into the scheduler, never to return.
   sched();
@@ -940,6 +968,6 @@ kill_system(void)
 void
 print_status(void)
 {
-  printf("Sleeping Processes Mean is %d\n Runnable Processes Maen is %d\n Running Processes Mean is %d\n",
-   sleeping_processes_mean, runnable_processes_mean, running_processes_mean);
+  printf("Sleeping Processes Mean is %d\nRunnable Processes Maen is %d\nRunning Processes Mean is %d\nProgram Time is %d\nStart Time is %d\nCPU Utolization is %d\n",
+   sleeping_processes_mean, runnable_processes_mean, running_processes_mean, program_time, start_time, cpu_utilization);
 }
