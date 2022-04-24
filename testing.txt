@@ -1,0 +1,138 @@
+RR:
+Original process pid: 3
+iteration: 0,   fork pid: 4,   current pid: 3
+PARENT --- pid: 3
+iteration: 1,   fork pid: 5,   current pid: 3
+PARENT --- pid: 3
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 0
+Start Time is 0
+CPU Utolization is 0
+Ticks 36
+
+iteration: 0,   fork pid: 0,   current pid: 4
+CHILD
+iteration: 1,   fork pid: 6,   current pid: 4
+PARENT --- pid: 4
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 1
+Start Time is 0
+CPU Utolization is 0
+Ticks 36
+
+iteration: 1,   fork pid: 0,   current pid: 5
+CHILD
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 1
+Start Time is 0
+CPU Utolization is 0
+Ticks 36
+
+iteration: 1,   fork pid: 0,   current pid: 6
+CHILD
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 1
+Start Time is 0
+CPU Utolization is 0
+Ticks 36
+
+
+SJF:
+Original process pid: 3
+iteration: 0,   fork pid: 4,   current pid: 3
+PARENT --- pid: 3
+iteration: 1,   fork pid: 5,   current pid: 3
+PARENT --- pid: 3
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 0
+Start Time is 0
+CPU Utolization is 0
+Ticks 56
+
+$ iteration: 0,   fork pid: 0,   current pid: 4
+CHILD
+iteraiteration: 1,   fork pid: 0,   current pid: 6
+CHILD
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 0
+Start Time is 0
+CPU Utolization is 0
+Ticks 57
+
+tion: 1,   fork pid: 6,   current pid: 4
+PARENT --- pid: 4
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 0
+Start Time is 0
+CPU Utolization is 0
+Ticks 57
+
+iteration: 1,   fork pid: 0,   current pid: 5
+CHILD
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 1
+Start Time is 0
+CPU Utolization is 0
+Ticks 57
+
+FCFS:
+Original process pid: 3
+iteration: 0,   fork pid: 4,   current piteration: 0,   fork pid: 0,   current pid: 4
+CHILD
+iteration: 1,   fork pid: 5,   current pid: 4
+PARENT --- pid: 4
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 0
+Start Time is 0
+CPU Utolization is 0
+Ticks 41
+
+id: 3
+PARENT --- pid: 3
+iteration: 1,   fork pid: 6,   current pid: 3
+PARENT --- pid: 3
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 0
+Start Time is 0
+CPU Utolization is 0
+Ticks 41
+
+$ iteration: 1,   fork pid: 0,   current pid: 5
+CHILD
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 1
+Start Time is 0
+CPU Utolization is 0
+Ticks 41
+
+iteration: 1,   fork pid: 0,   current pid: 6
+CHILD
+Sleeping Processes Mean is 0
+Runnable Processes Maen is 0
+Running Processes Mean is 0
+Program Time is 1
+Start Time is 0
+CPU Utolization is 0
+Ticks 41

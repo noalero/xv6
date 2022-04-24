@@ -38,7 +38,7 @@ uint runnable_processes_mean = 0;
 uint running_processes_mean = 0;
 int num_of_proc = 0; // The number of processes in system (including processes that allready exited)
 int cpu_utilization = 0;
-uint start_time = 0;
+uint start_time;
 
 // acquire(&ptimelock);
 // uint program_time = 0;
