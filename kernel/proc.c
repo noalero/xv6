@@ -165,14 +165,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
-  // // Check if needed here
-  // p->last_runnable_time = 0;
-  // p->mean_ticks = 0;
-  // p->last_ticks = 0;
-  // p->runnable_time = 0;
-  // p->running_time = 0;
-  // p->sleeping_time = 0;
-  // //////////////////////
+   // **** Check if needed here: p->last_runnable_time = 0;p->mean_ticks = 0;p->last_ticks = 0;p->runnable_time = 0;p->running_time = 0;p->sleeping_time = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -370,21 +363,22 @@ fork(void)
 
   pid = np->pid;
 
-  release(&np->lock);//acquire?
+  release(&np->lock);
 
   acquire(&wait_lock);
   np->parent = p;
   release(&wait_lock);
 
+
+  acquire(&tickslock);
+  uint ticks0 = ticks;
+  release(&tickslock);
   acquire(&np->lock);
   // np->mean_ticks = 0;
   // np->last_ticks = 0;
   // np->sleeping_time = 0;
   // np->runnable_time = 0;
   // np->running_time = 0;
-  acquire(&tickslock);
-  uint ticks0 = ticks;
-  release(&tickslock);
   np->last_time_state_changed = ticks0;
   np->last_runnable_time = ticks0;
   np->state = RUNNABLE;
@@ -541,8 +535,8 @@ void checkAndPause(int processesCount)
 {
     struct proc *p;
     uint curr_time = 0;
-    intr_on();
-
+    //intr_on();
+    uint pauseLeftTime=0;
     for(p = proc; p < &proc[NPROC]; p++) {
         acquire(&p->lock);
         if (p->should_pause == 1) {
@@ -551,7 +545,10 @@ void checkAndPause(int processesCount)
             uint ticks0 = ticks;
             release(&tickslock);
             curr_time = ticks0;
-            while (curr_time - ticks0 < p->pause_left_time/(processesCount/6)) {
+            acquire(&p->lock);
+            pauseLeftTime = p->pause_left_time/(processesCount/6);
+            release(&p->lock);
+            while (curr_time - ticks0 < pauseLeftTime) {
                 acquire(&tickslock);
                 curr_time = ticks;
                 release(&tickslock);
@@ -574,7 +571,7 @@ int initPause(void)
         p->should_pause = 0;
         p->pause_left_time=0;
         release(&p->lock);
-        processesCount++;
+        processesCount++; // it is concurrent safe?
     }
     return processesCount;
 }
@@ -594,7 +591,9 @@ scheduler(void)
   struct cpu *c = mycpu();
   int processesCount;
   processesCount = initPause();
-  uint ticks0, latest_runnable_time_burst;
+  //processesCount = 6; //change me to the upper line
+
+    uint ticks0, latest_runnable_time_burst;
   c->proc = 0;
 
   for(;;){
@@ -613,6 +612,7 @@ scheduler(void)
         latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
         p->runnable_time += latest_runnable_time_burst;
         p->last_time_state_changed = ticks0;
+
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
@@ -754,11 +754,11 @@ void
 yield(void)
 {
   struct proc *p = myproc();
-  acquire(&p->lock);
   uint ticks0;
   acquire(&tickslock);
   ticks0 = ticks;
   release(&tickslock);
+  acquire(&p->lock);
   uint latest_running_time_burst = ticks0 - p->last_time_state_changed; // Only a process in <p->state == RUNNING> can yield
   p->running_time += latest_running_time_burst;
   p->last_time_state_changed = ticks0; // The <ticks> value of the time <p> entered <RUNNABLE> state
@@ -795,14 +795,12 @@ void
 sleep(void *chan, struct spinlock *lk)
 {
   struct proc *p = myproc();
-  
   // Must acquire p->lock in order to
   // change p->state and then call sched.
   // Once we hold p->lock, we can be
   // guaranteed that we won't miss any wakeup
   // (wakeup locks p->lock),
   // so it's okay to release lk.
-
   acquire(&p->lock);  //DOC: sleeplock1
   release(lk);
 
@@ -810,7 +808,9 @@ sleep(void *chan, struct spinlock *lk)
   acquire(&tickslock);
   ticks0 = ticks;
   release(&tickslock);
-  uint time_since_state_changed = ticks0 - p->last_time_state_changed; 
+
+
+  uint time_since_state_changed = ticks0 - p->last_time_state_changed;
   if (p->state == RUNNING){
     p->running_time += time_since_state_changed;
   }
@@ -818,8 +818,6 @@ sleep(void *chan, struct spinlock *lk)
     p->runnable_time += time_since_state_changed;
   }
   p->last_time_state_changed = ticks0;
-
-
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
@@ -854,7 +852,6 @@ wakeup(void *chan)
         p->last_time_state_changed = ticks0;
         p->last_runnable_time = ticks0;
         p->state = RUNNABLE;
-
       }
       release(&p->lock);
     }
@@ -986,6 +983,6 @@ print_status(void)
   acquire(&tickslock);
   uint ticks0 = ticks;
   release(&tickslock);
-  printf("Sleeping Processes Mean is %d\nRunnable Processes Maen is %d\nRunning Processes Mean is %d\nProgram Time is %d\nStart Time is %d\nCPU Utolization is %d\nTicks %d\n",
+  printf("Sleeping Processes Mean is %d\nRunnable Processes Mean is %d\nRunning Processes Mean is %d\nProgram Time is %d\nStart Time is %d\nCPU Utolization is %d\nTicks %d\n",
    sleeping_processes_mean, runnable_processes_mean, running_processes_mean, program_time, start_time, cpu_utilization, ticks0);
 }
