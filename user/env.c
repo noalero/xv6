@@ -19,19 +19,14 @@ void env(int size, int interval, char* env_name) {
     int n_forks = 1;
     int pid;
     for (int i = 0; i < n_forks; i++) {
-        printf("env:: pid before fork: %d\n", getpid());
         pid = fork();
-        printf("env:: pid after fork: %d\n", getpid());
-        printf("env:: pid: %d\n", pid);
     }
     for (int i = 0; i < loop_size; i++) {
         if (i % (int)(loop_size / 10e0) == 0) {
         	if (pid == 0) { // child
         		printf("%s %d/%d completed.\n", env_name, i, loop_size);
-                printf("env:: child's pid: %d\n", getpid());
         	} else { // parent
         		printf(" ");
-                printf("env:: parent's pid: %d\n", getpid());
         	}
         }
         if (i % interval == 0) {
@@ -54,16 +49,8 @@ int main (int argc, char* argv[]){
     int num_of_forks = 2;
     int pid = getpid();
     int fork_pid;
-    printf("Original process pid: %d\n", pid);
     for(int i = 0; i < num_of_forks; i=i+1){
         fork_pid = fork();
-        printf("iteration: %d,   fork pid: %d,   current pid: %d\n", i, fork_pid, getpid());
-        if (fork_pid == 0){
-            printf("CHILD\n");
-        }
-        else{
-            printf("PARENT --- pid: %d\n", getpid());
-        }
     }
     print_status();
     exit(0);
