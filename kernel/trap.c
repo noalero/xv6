@@ -151,11 +151,9 @@ kerneltrap()
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING){
-    /***************************************** ADDED FCFS ********************************************/
-    acquire(&tickslock);
-    myproc()->last_runnable_time = ticks;
-    release(&tickslock);
-    /***************************************** ADDED FCFS ********************************************/
+    // There is no need to update <mrproc->last_runnable_time> here,
+    // The <mayproc->state> is not changed to <RUNNABLE> here,
+    // The change occurs in <yield()> and so does the update.
     yield();
   }
 
