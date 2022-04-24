@@ -143,12 +143,12 @@ found:
   p->pid = allocpid();
   p->state = USED;
   // // TODO: Check if needed here
-  p->last_runnable_time = 0;
-  p->mean_ticks = 0;
-  p->last_ticks = 0;
-  p->runnable_time = 0;
-  p->running_time = 0;
-  p->sleeping_time = 0;
+  // p->last_runnable_time = 0;
+  // p->mean_ticks = 0;
+  // p->last_ticks = 0;
+  // p->runnable_time = 0;
+  // p->running_time = 0;
+  // p->sleeping_time = 0;
   ////////////////////////
 
   // Allocate a trapframe page.
@@ -288,14 +288,16 @@ userinit(void)
    running_processes_mean = 0;
    num_of_proc = 0; 
    cpu_utilization = 0;
-    acquire(&tickslock);
-    start_time = ticks;
-    release(&tickslock);
+  acquire(&tickslock);
+  start_time = ticks;
+  release(&tickslock);
 
   p->state = RUNNABLE;
   acquire(&tickslock);
-  p->last_runnable_time = ticks;
+  uint ticks0 = ticks;
   release(&tickslock);
+  p->last_runnable_time = ticks0;
+  p->last_time_state_changed = ticks0;
   release(&p->lock);
 }
 
@@ -357,18 +359,18 @@ fork(void)
 
   pid = np->pid;
 
-  release(&np->lock);//acquire?
+  release(&np->lock);
 
   acquire(&wait_lock);
   np->parent = p;
   release(&wait_lock);
 
   acquire(&np->lock);
-  // np->mean_ticks = 0;
-  // np->last_ticks = 0;
-  // np->sleeping_time = 0;
-  // np->runnable_time = 0;
-  // np->running_time = 0;
+  np->mean_ticks = 0;
+  np->last_ticks = 0;
+  np->sleeping_time = 0;
+  np->runnable_time = 0;
+  np->running_time = 0;
   acquire(&tickslock);
   uint ticks0 = ticks;
   release(&tickslock);
@@ -456,14 +458,13 @@ exit(int status)
   // Updating global variables: program_time | cpu_utilization
   acquire(&ptimelock);
 
-  acquire(&runninglock);
   program_time += p->running_time;
-  release(&runninglock);
-
-  acquire(&cpu_utlock);
+  
   acquire(&tickslock);
-  cpu_utilization = program_time / (ticks - start_time);
+  uint ticks0 =  ticks;
   release(&tickslock);
+  acquire(&cpu_utlock);
+  cpu_utilization = program_time * 100 / (ticks0 - start_time);  
   release(&cpu_utlock);
 
   release(&ptimelock);
@@ -793,18 +794,18 @@ sleep(void *chan, struct spinlock *lk)
   acquire(&p->lock);  //DOC: sleeplock1
   release(lk);
 
-  uint ticks0;
-  acquire(&tickslock);
-  ticks0 = ticks;
-  release(&tickslock);
-  uint time_since_state_changed = ticks0 - p->last_time_state_changed; 
-  if (p->state == RUNNING){
-    p->running_time += time_since_state_changed;
-  }
-  else if (p->state == RUNNABLE){ // Check if a process can sleep from <RUNNABLE> state
-    p->runnable_time += time_since_state_changed;
-  }
-  p->last_time_state_changed = ticks0;
+  // uint ticks0;
+  // acquire(&tickslock);
+  // ticks0 = ticks;
+  // release(&tickslock);
+  // uint time_since_state_changed = ticks0 - p->last_time_state_changed; 
+  // if (p->state == RUNNING){
+  //   p->running_time += time_since_state_changed;
+  // }
+  // else if (p->state == RUNNABLE){ // Check if a process can sleep from <RUNNABLE> state
+  //   p->runnable_time += time_since_state_changed;
+  // }
+  // p->last_time_state_changed = ticks0;
 
 
   // Go to sleep.

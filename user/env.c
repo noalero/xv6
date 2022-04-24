@@ -45,49 +45,49 @@ void env_freq() {
 }
 
 
-int main (int argc, char* argv[]){
-    int num_of_forks = 2;
-    int pid = getpid();
-    int fork_pid;
-    for(int i = 0; i < num_of_forks; i=i+1){
-        fork_pid = fork();
-    }
-    print_status();
-    exit(0);
-}
-
-
 // int main (int argc, char* argv[]){
-//     int n_forks = 1;
-//      int pid = getpid();
-//      printf("Original pid: %d\n", pid);
-//      for (int i = 0; i < n_forks; i++) {
-//        fork();
-//      }
-//     int larges = 0;
-//     int freqs = 0;
-//     int n_experiments = 10;
-//     for (int i = 0; i < n_experiments; i++) {
-//         env_large(1, 3, 100);
-//         if (pid == getpid()) { // original process
-//             printf("experiment %d/%d\n", i + 1, n_experiments);
-//             larges = (larges * i + 50) / (i + 1); 
-//         }
-//         printf("Before sleep pid: %d\n", getpid());
-//         //sleep(10);
-//         printf("After sleep pid: %d\n", getpid());
-//         env_freq(10, 100);
-//         if (pid == getpid()) { // original process
-//             freqs = (freqs * i + 0) / (i + 1);
-//             printf("freqs pid: %d\n", getpid());
-//         }
+//     int num_of_forks = 2;
+//     int pid = getpid();
+//     int fork_pid;
+//     for(int i = 0; i < num_of_forks; i=i+1){
+//         fork_pid = fork();
 //     }
-//     if (pid == getpid()) { // original process
-//         printf("larges = %d\nfreqs = %d\n", larges, freqs);
-//         printf("finishing pid: %d\n", getpid());
-//     }
+//     print_status();
 //     exit(0);
 // }
+
+
+int main (int argc, char* argv[]){
+    int n_forks = 1;
+     int pid = getpid();
+     printf("Original pid: %d\n", pid);
+     for (int i = 0; i < n_forks; i++) {
+       fork();
+     }
+    int larges = 0;
+    int freqs = 0;
+    int n_experiments = 10;
+    for (int i = 0; i < n_experiments; i++) {
+        env_large(1, 3, 100);
+        if (pid == getpid()) { // original process
+            printf("experiment %d/%d\n", i + 1, n_experiments);
+            larges = (larges * i + 50) / (i + 1); 
+        }
+        printf("Before sleep pid: %d\n", getpid());
+        sleep(10);
+        printf("After sleep pid: %d\n", getpid());
+        env_freq(10, 100);
+        if (pid == getpid()) { // original process
+            freqs = (freqs * i + 0) / (i + 1);
+            printf("freqs pid: %d\n", getpid());
+        }
+    }
+    if (pid == getpid()) { // original process
+        printf("larges = %d\nfreqs = %d\n", larges, freqs);
+        printf("finishing pid: %d\n", getpid());
+    }
+    exit(0);
+}
 
 
 // int
