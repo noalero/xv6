@@ -143,12 +143,12 @@ found:
   p->pid = allocpid();
   p->state = USED;
   // // TODO: Check if needed here
-  p->last_runnable_time = 0;
-  p->mean_ticks = 0;
-  p->last_ticks = 0;
-  p->runnable_time = 0;
-  p->running_time = 0;
-  p->sleeping_time = 0;
+  // p->last_runnable_time = 0;
+  // p->mean_ticks = 0;
+  // p->last_ticks = 0;
+  // p->runnable_time = 0;
+  // p->running_time = 0;
+  // p->sleeping_time = 0;
   ////////////////////////
 
   // Allocate a trapframe page.
@@ -288,14 +288,16 @@ userinit(void)
    running_processes_mean = 0;
    num_of_proc = 0; 
    cpu_utilization = 0;
-    acquire(&tickslock);
-    start_time = ticks;
-    release(&tickslock);
+  acquire(&tickslock);
+  start_time = ticks;
+  release(&tickslock);
 
   p->state = RUNNABLE;
   acquire(&tickslock);
-  p->last_runnable_time = ticks;
+  uint ticks0 = ticks;
   release(&tickslock);
+  p->last_runnable_time = ticks0;
+  p->last_time_state_changed = ticks0;
   release(&p->lock);
 }
 
@@ -357,18 +359,18 @@ fork(void)
 
   pid = np->pid;
 
-  release(&np->lock);//acquire?
+  release(&np->lock);
 
   acquire(&wait_lock);
   np->parent = p;
   release(&wait_lock);
 
   acquire(&np->lock);
-  // np->mean_ticks = 0;
-  // np->last_ticks = 0;
-  // np->sleeping_time = 0;
-  // np->runnable_time = 0;
-  // np->running_time = 0;
+  np->mean_ticks = 0;
+  np->last_ticks = 0;
+  np->sleeping_time = 0;
+  np->runnable_time = 0;
+  np->running_time = 0;
   acquire(&tickslock);
   uint ticks0 = ticks;
   release(&tickslock);
@@ -456,14 +458,13 @@ exit(int status)
   // Updating global variables: program_time | cpu_utilization
   acquire(&ptimelock);
 
-  acquire(&runninglock);
   program_time += p->running_time;
-  release(&runninglock);
-
-  acquire(&cpu_utlock);
+  
   acquire(&tickslock);
-  cpu_utilization = program_time / (ticks - start_time);
+  uint ticks0 =  ticks;
   release(&tickslock);
+  acquire(&cpu_utlock);
+  cpu_utilization = program_time * 100 / (ticks0 - start_time);  
   release(&cpu_utlock);
 
   release(&ptimelock);
@@ -640,9 +641,11 @@ void schedulerSJF(void){
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->mean_ticks == min && p->state == RUNNABLE) {
+        release(&p->lock);
         acquire(&tickslock);
         ticks0 = ticks;
         release(&tickslock);
+        acquire(&p->lock);
         latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
         p->runnable_time += latest_runnable_time_burst;
         p->state = RUNNING;
@@ -651,9 +654,8 @@ void schedulerSJF(void){
         swtch(&c->context, &p->context);
         
         acquire(&tickslock);
-        p->
-        last_ticks = ticks - ticks0; // CPU burst
-        printf("\n***PROC.C:lastTicks:%d\n",p->last_ticks); // Omri added - for debug
+        p->last_ticks = ticks- ticks0; // CPU burst
+        //printf("\n***PROC.C:lastTicks:%d\n",p->last_ticks); // Omri added - for debug
         release(&tickslock);
 
         p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * rate) / 10;
@@ -794,18 +796,18 @@ sleep(void *chan, struct spinlock *lk)
   acquire(&p->lock);  //DOC: sleeplock1
   release(lk);
 
-  uint ticks0;
-  acquire(&tickslock);
-  ticks0 = ticks;
-  release(&tickslock);
-  uint time_since_state_changed = ticks0 - p->last_time_state_changed; 
-  if (p->state == RUNNING){
-    p->running_time += time_since_state_changed;
-  }
-  else if (p->state == RUNNABLE){ // Check if a process can sleep from <RUNNABLE> state
-    p->runnable_time += time_since_state_changed;
-  }
-  p->last_time_state_changed = ticks0;
+  // uint ticks0;
+  // acquire(&tickslock);
+  // ticks0 = ticks;
+  // release(&tickslock);
+  // uint time_since_state_changed = ticks0 - p->last_time_state_changed; 
+  // if (p->state == RUNNING){
+  //   p->running_time += time_since_state_changed;
+  // }
+  // else if (p->state == RUNNABLE){ // Check if a process can sleep from <RUNNABLE> state
+  //   p->runnable_time += time_since_state_changed;
+  // }
+  // p->last_time_state_changed = ticks0;
 
 
   // Go to sleep.
@@ -834,9 +836,9 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         uint ticks0;
-        acquire (&tickslock);
+        //acquire (&tickslock); //This line causes the "panic:acquire" error
         ticks0 = ticks;
-        release(&tickslock);
+        //release(&tickslock);
         uint latest_sleeping_time_burst = ticks0 - p->last_time_state_changed; // if(p->state == SLEEPING
         p->sleeping_time += latest_sleeping_time_burst;
         p->last_time_state_changed = ticks0;
@@ -844,7 +846,7 @@ wakeup(void *chan)
         p->state = RUNNABLE;
 
       }
-      release(&p->lock);
+     release(&p->lock);
     }
   }
 }
@@ -958,15 +960,18 @@ kill_system(void)
 {
   //Omri- I checked and the function is always gets into pid=0 -> we need to understand why
   struct proc *p;
-  for(p = proc; p < &proc[NPROC]; p++){
-      // acquire(&p->lock);
+  int curr_pid;
+  for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
       // if((p->pid > 3) || (p->pid < 1)){// init process pid is 1, shell process pids are 2,3 - from a print OMRI made in the "exit" function
       //     p->killed = 1; 
       // }
-      // release(&p->lock);
-      if(p->pid > 1) //TODO check 2 or 3
+      curr_pid = p->pid;
+      release(&p->lock);
+
+      if (curr_pid > 1) //TODO check 2 or 3
       {
-        kill(p->pid);
+          kill(curr_pid);
       }
   }
   return 0; 
@@ -975,14 +980,14 @@ kill_system(void)
 void
 print_status(void)
 {
-  acquire(&tickslock);
-  uint ticks0 = ticks;
-  release(&tickslock);
+//  acquire(&tickslock);
+//  uint ticks0 = ticks;
+//  release(&tickslock);
   acquire(&myproc()->lock);
-  if(myproc()->pid%20 == 0)
-  printf("System Details:\nSleeping Processes Mean is %d\nRunnable Processes Mean is %d\nRunning Processes Mean is %d\nProgram Time is %d\nStart Time is %d\nCPU Utilization is %d\nTicks %d\n********************\n\n",
-  sleeping_processes_mean, runnable_processes_mean, running_processes_mean, program_time, start_time, cpu_utilization, ticks0);
+//  if(myproc()->pid%6 == 0)
+  printf("System Details:\nSleeping Processes Mean is %d\nRunnable Processes Mean is %d\nRunning Processes Mean is %d\nProgram Time is %d\nStart Time is %d\nCPU Utilization is %d\n********************\n\n",
+  sleeping_processes_mean, runnable_processes_mean, running_processes_mean, program_time, start_time, cpu_utilization);
   //printf("Process pid %d Details:\nrunnableTime:%d\nsleepingTime:%d\nrunningTime:%d\nlast runnable time : %d\nlast_time_state_changed: %d\nlastTicks:%d\nmeanTicks:%d\n*******************\n\n",myproc()->pid,myproc()->runnable_time,myproc()->sleeping_time,myproc()->running_time,myproc()->last_time_state_changed ,myproc()->last_runnable_time,myproc()->last_ticks,myproc()->mean_ticks);//TODO:Remove me
-  printf("Process num %d , last ticks:%d\n",myproc()->pid,myproc()->last_ticks);
+  //printf("Process num %d , last ticks:%d, mean ticks:%d\n",myproc()->pid,myproc()->last_ticks,myproc()->mean_ticks);
   release(&myproc()->lock);
 }

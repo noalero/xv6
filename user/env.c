@@ -8,32 +8,77 @@
 #include "kernel/memlayout.h"
 #include "kernel/riscv.h"
 
-int loop_size = 10000;
-int large_interval = 1000;
-int large_size = 1000;
-int freq_interval = 100;
-int freq_size = 100;
+//int loop_size = 10000;
+//int large_interval = 1000;
+//int large_size = 1000;
+//int freq_interval = 100;
+//int freq_size = 100;
+//void env(int size, int interval, char* env_name) {
+//    int result = 1;
+//    int loop_size = 3;//(int)(10e6);
+//    int n_forks = 1;
+//    int pid;
+//    for (int i = 0; i < n_forks; i++) {
+//        pid = fork();
+//    }
+//    for (int i = 0; i < loop_size; i++) {
+//        if (i % (int)(loop_size / 10e0) == 0) {
+//        	if (pid == 0) { // child
+//        		printf("%s %d/%d completed.\n", env_name, i, loop_size);
+//        	} else { // parent
+//        		printf(" ");
+//        	}
+//        }
+//        if (i % interval == 0) {
+//            result = result * size;
+//        }
+//    }
+//    printf("\n");
+//}
+
+
+//int main (int argc, char* argv[]){
+//    int num_of_forks = 4;
+////    int pid = getpid();
+//   int fork_pid;
+//    for(int i = 0; i < num_of_forks; i=i+1){
+//        //fork_pid = fork();
+//      fork_pid = fork();
+//    }
+//    sleep(10);
+//    for(int i = 0; i < num_of_forks; i=i+1){
+//        //fork_pid = fork();
+//        fork_pid = fork();
+//    }
+//    if(fork_pid>21312)
+//        printf("fsafsa");
+//    print_status();
+//    exit(0);
+//}
+
 void env(int size, int interval, char* env_name) {
     int result = 1;
-    int loop_size = 3;//(int)(10e6);
-    int n_forks = 1;
+    int loop_size = 10e6;
+    int n_forks = 2;
     int pid;
     for (int i = 0; i < n_forks; i++) {
         pid = fork();
     }
     for (int i = 0; i < loop_size; i++) {
-        if (i % (int)(loop_size / 10e0) == 0) {
-        	if (pid == 0) { // child
-        		printf("%s %d/%d completed.\n", env_name, i, loop_size);
-        	} else { // parent
-        		printf(" ");
-        	}
+        if (i % (loop_size / (int) 10e0) == 0) {
+            if (pid == 0) {
+                printf("%s %d/%d completed.\n", env_name, i, loop_size);
+            } else {
+                printf(" ");
+            }
         }
         if (i % interval == 0) {
             result = result * size;
         }
     }
+    sleep(5);
     printf("\n");
+
 }
 
 void env_large() {
@@ -45,23 +90,16 @@ void env_freq() {
 }
 
 
-int main (int argc, char* argv[]){
-    int num_of_forks = 4;
-//    int pid = getpid();
-   int fork_pid;
-    for(int i = 0; i < num_of_forks; i=i+1){
-        //fork_pid = fork();
-      fork_pid = fork();
-    }
-    for(int i = 0; i < num_of_forks; i=i+1){
-        //fork_pid = fork();
-        fork_pid = fork();
-    }
-    if(fork_pid>21312)
-        printf("fsafsa");
+int
+main(int argc, char *argv[]){
+    env_large();
+    env_freq();
     print_status();
+
     exit(0);
+
 }
+
 
 //
 // int main (int argc, char* argv[]){
