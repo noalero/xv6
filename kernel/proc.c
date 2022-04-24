@@ -651,10 +651,13 @@ void schedulerSJF(void){
         swtch(&c->context, &p->context);
         
         acquire(&tickslock);
-        p->last_ticks = ticks - ticks0; // CPU burst
+        p->
+        last_ticks = ticks - ticks0; // CPU burst
+        printf("\n***PROC.C:lastTicks:%d\n",p->last_ticks); // Omri added - for debug
         release(&tickslock);
 
         p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * rate) / 10;
+        //printf("***meanTicks:%d\n",p->mean_ticks);// Omri added - for debug
         c->proc = 0;
         release(&p->lock);
         break;
@@ -676,7 +679,7 @@ void schedulerFCFS(void){
 
     for(;;){
      intr_on();
-     checkAndPause(processesCount); // Check if <pause_system> was called, and pause acordinglly
+     checkAndPause(processesCount); // Check if <pause_system> was called, and pause accordingly
      min = __INT_MAX__;
      // Find the process with minimal <last_runnable_time>
      for(p = proc; p < &proc[NPROC]; p++) {
@@ -707,8 +710,6 @@ void schedulerFCFS(void){
      }
   }
 }
-
-
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
 // intena because intena is a property of this
@@ -977,6 +978,11 @@ print_status(void)
   acquire(&tickslock);
   uint ticks0 = ticks;
   release(&tickslock);
-  printf("Sleeping Processes Mean is %d\nRunnable Processes Maen is %d\nRunning Processes Mean is %d\nProgram Time is %d\nStart Time is %d\nCPU Utolization is %d\nTicks %d\n",
-   sleeping_processes_mean, runnable_processes_mean, running_processes_mean, program_time, start_time, cpu_utilization, ticks0);
+  acquire(&myproc()->lock);
+  if(myproc()->pid%20 == 0)
+  printf("System Details:\nSleeping Processes Mean is %d\nRunnable Processes Mean is %d\nRunning Processes Mean is %d\nProgram Time is %d\nStart Time is %d\nCPU Utilization is %d\nTicks %d\n********************\n\n",
+  sleeping_processes_mean, runnable_processes_mean, running_processes_mean, program_time, start_time, cpu_utilization, ticks0);
+  //printf("Process pid %d Details:\nrunnableTime:%d\nsleepingTime:%d\nrunningTime:%d\nlast runnable time : %d\nlast_time_state_changed: %d\nlastTicks:%d\nmeanTicks:%d\n*******************\n\n",myproc()->pid,myproc()->runnable_time,myproc()->sleeping_time,myproc()->running_time,myproc()->last_time_state_changed ,myproc()->last_runnable_time,myproc()->last_ticks,myproc()->mean_ticks);//TODO:Remove me
+  printf("Process num %d , last ticks:%d\n",myproc()->pid,myproc()->last_ticks);
+  release(&myproc()->lock);
 }
