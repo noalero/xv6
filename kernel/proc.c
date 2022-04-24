@@ -32,35 +32,14 @@ struct spinlock runninglock;
 struct spinlock ptimelock;
 struct spinlock cpu_utlock;
 int rate = 5;
-uint program_time = 0;
-uint sleeping_processes_mean = 0;
-uint runnable_processes_mean = 0;
-uint running_processes_mean = 0;
-int num_of_proc = 0; // The number of processes in system (including processes that allready exited)
-int cpu_utilization = 0;
+uint program_time;
+uint sleeping_processes_mean;
+uint runnable_processes_mean;
+uint running_processes_mean;
+int num_of_proc; // The number of processes in system (including processes that allready exited)
+int cpu_utilization;
 uint start_time;
 
-// acquire(&ptimelock);
-// uint program_time = 0;
-// release(&ptimelock);
-// acquire(&sleepinlock);
-// uint sleeping_processes_mean = 0;
-// release(&sleepinlock);
-// acquire(&runnablelock);
-// uint runnable_processes_mean = 0;
-// release(&runnablelock);
-// acquire(&runninglock);
-// uint running_processes_mean = 0;
-// release(&runninglock);
-// acquire(&noplock);
-// int num_of_proc = 0; // The number of processes in system (including processes that allready exited)
-// release(&noplock);
-// acquire(&cpu_utlock);
-// int cpu_utilization = 0;
-// release(&cpu_utlock);
-// acquire(&stimelock);
-// uint start_time = 0;
-// release(&stimelock);
 
 
 // Allocate a page for each process's kernel stack.
@@ -84,9 +63,7 @@ void
 procinit(void)
 {
   struct proc *p;
-  acquire(&tickslock);
-  start_time = ticks;
-  release(&tickslock);
+
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
   initlock(&noplock, "number_of_proc_lock");
@@ -165,14 +142,14 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
-  // // Check if needed here
-  // p->last_runnable_time = 0;
-  // p->mean_ticks = 0;
-  // p->last_ticks = 0;
-  // p->runnable_time = 0;
-  // p->running_time = 0;
-  // p->sleeping_time = 0;
-  // //////////////////////
+  // // TODO: Check if needed here
+  p->last_runnable_time = 0;
+  p->mean_ticks = 0;
+  p->last_ticks = 0;
+  p->runnable_time = 0;
+  p->running_time = 0;
+  p->sleeping_time = 0;
+  ////////////////////////
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -298,12 +275,22 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
-  // Check if needed here
-  // p->mean_ticks = 0;
-  // p->last_ticks = 0;
-  // p->sleeping_time = 0;
-  // p->running_time = 0;
-  // p->runnable_time = 0;
+  // TODO: Check if needed here
+  p->mean_ticks = 0;
+  p->last_ticks = 0;
+  p->sleeping_time = 0;
+  p->running_time = 0;
+  p->runnable_time = 0;
+
+   program_time = 0;
+   sleeping_processes_mean = 0;
+   runnable_processes_mean = 0;
+   running_processes_mean = 0;
+   num_of_proc = 0; 
+   cpu_utilization = 0;
+    acquire(&tickslock);
+    start_time = ticks;
+    release(&tickslock);
 
   p->state = RUNNABLE;
   acquire(&tickslock);
@@ -451,8 +438,7 @@ exit(int status)
   // Updating global variables: num_of_proc  |
   // sleeping_processes_mean  |  runnable_processes_mean  |  running_processes_mean
   acquire(&noplock);
-  num_of_proc ++;
-
+  
   acquire(&sleepinlock);
   sleeping_processes_mean = ((sleeping_processes_mean * num_of_proc) + p->sleeping_time) / (num_of_proc + 1);
   release(&sleepinlock);
@@ -463,6 +449,7 @@ exit(int status)
   running_processes_mean = ((running_processes_mean * num_of_proc) + p->running_time) / (num_of_proc + 1);
   release(&runninglock);
 
+  num_of_proc ++;
   release(&noplock);
   //-----------------------------------//
 
@@ -971,11 +958,15 @@ kill_system(void)
   //Omri- I checked and the function is always gets into pid=0 -> we need to understand why
   struct proc *p;
   for(p = proc; p < &proc[NPROC]; p++){
-      acquire(&p->lock);
-      if((p->pid > 3) || (p->pid < 1)){// init process pid is 1, shell process pids are 2,3 - from a print OMRI made in the "exit" function
-          p->killed = 1; //kill(p->pid);
+      // acquire(&p->lock);
+      // if((p->pid > 3) || (p->pid < 1)){// init process pid is 1, shell process pids are 2,3 - from a print OMRI made in the "exit" function
+      //     p->killed = 1; 
+      // }
+      // release(&p->lock);
+      if(p->pid > 1) //TODO check 2 or 3
+      {
+        kill(p->pid);
       }
-      release(&p->lock);
   }
   return 0; 
 }
