@@ -31,12 +31,17 @@ struct spinlock runnablelock;
 struct spinlock runninglock;
 struct spinlock ptimelock;
 struct spinlock cpu_utlock;
+struct spinlock pause_time_lock;
+struct spinlock pause_flag_lock;
 int rate = 5;
+int start_pause_time=0;
+int pause_duration_time=0;
+int pause_flag =0;
 uint program_time;
 uint sleeping_processes_mean;
 uint runnable_processes_mean;
 uint running_processes_mean;
-int num_of_proc; // The number of processes in system (including processes that allready exited)
+int num_of_proc; // The number of processes in system (including processes that already exited)
 int cpu_utilization;
 uint start_time;
 
@@ -524,49 +529,6 @@ wait(uint64 addr)
   }
 }
 
-//Maybe we need to change the functionality to cause the pause be more accurate - right now it is not exactly for x seconds
-void checkAndPause(int processesCount)
-{
-    struct proc *p;
-    uint curr_time = 0;
-    intr_on();
-
-    for(p = proc; p < &proc[NPROC]; p++) {
-        acquire(&p->lock);
-        if (p->should_pause == 1) {
-            release(&p->lock);
-            acquire(&tickslock);
-            uint ticks0 = ticks;
-            release(&tickslock);
-            curr_time = ticks0;
-            while (curr_time - ticks0 < p->pause_left_time/(processesCount/6)) {
-                acquire(&tickslock);
-                curr_time = ticks;
-                release(&tickslock);
-            }
-            acquire(&p->lock);
-            p->pause_left_time = 0;
-            p->should_pause = 0;
-        }
-        release(&p->lock);
-    }
-}
-
-int initPause(void)
-{
-    struct proc *p;
-    int processesCount=1;
-    // Omri added - initialize all shouldPause flags to zero - is it necessary?
-    for(p = proc; p < &proc[NPROC]; p++) {
-        acquire(&p->lock);
-        p->should_pause = 0;
-        p->pause_left_time=0;
-        release(&p->lock);
-        processesCount++;
-    }
-    return processesCount;
-}
-
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -580,37 +542,53 @@ scheduler(void)
   printf("proc.c RR\n");
   struct proc *p;
   struct cpu *c = mycpu();
-  int processesCount;
-  processesCount = initPause();
   uint ticks0, latest_runnable_time_burst;
   c->proc = 0;
-
+  acquire(&tickslock);
+  uint currTime= ticks;
+  release(&tickslock);
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
-      intr_on();
-      checkAndPause(processesCount);
-      for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        acquire(&tickslock);
-        ticks0 = ticks;
-        release(&tickslock);
-        latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
-        p->runnable_time += latest_runnable_time_burst;
-        p->last_time_state_changed = ticks0;
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
+      acquire(&pause_flag_lock);
+      acquire(&pause_time_lock);
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
+      if(pause_flag==0 || currTime>=start_pause_time+pause_duration_time) {
+          pause_flag = 0;
+          release(&pause_flag_lock);
+          release(&pause_time_lock);
+
+          intr_on();
+          for (p = proc; p < &proc[NPROC]; p++) {
+              acquire(&p->lock);
+              if (p->state == RUNNABLE) {
+                  // Switch to chosen process.  It is the process's job
+                  // to release its lock and then reacquire it
+                  // before jumping back to us.
+                  acquire(&tickslock);
+                  ticks0 = ticks;
+                  release(&tickslock);
+                  latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
+                  p->runnable_time += latest_runnable_time_burst;
+                  p->last_time_state_changed = ticks0;
+                  p->state = RUNNING;
+                  c->proc = p;
+                  swtch(&c->context, &p->context);
+
+                  // Process is done running for now.
+                  // It should have changed its p->state before coming back.
+                  c->proc = 0;
+              }
+              release(&p->lock);
+          }
       }
-      release(&p->lock);
-    }
+      else
+      {
+          release(&pause_flag_lock);
+          release(&pause_time_lock);
+          acquire(&tickslock);
+          currTime= ticks;
+          release(&tickslock);
+      }
   }
 }
 //The shell should get commands like in the RR scheduler?
@@ -621,52 +599,74 @@ void schedulerSJF(void){
   struct cpu *c = mycpu();
   c->proc = 0;
   int min = __INT_MAX__;
-  int processesCount =  initPause();
   uint ticks0, latest_runnable_time_burst;
 
-  for(;;){
-     intr_on();
-     checkAndPause(processesCount);
-     min = __INT_MAX__; // I think this line should be here (as in schedualerFCFS)
+    acquire(&tickslock);
+    uint currTime= ticks;
+    release(&tickslock);
+    for(;;){
+        // Avoid deadlock by ensuring that devices can interrupt.
+        acquire(&pause_time_lock);
+        acquire(&pause_flag_lock);
+        //acquire(&myproc()->lock);
+        if(pause_flag==0 || currTime>=start_pause_time+pause_duration_time) {
+            //release(&myproc()->lock);
+            pause_flag = 0;
+            release(&pause_flag_lock);
+            release(&pause_time_lock);
 
-    // Find the process with minimal <mean_ticks>
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->mean_ticks < min && p->state == RUNNABLE) {
-        min = p->mean_ticks;
+            intr_on();
+         min = __INT_MAX__; // I think this line should be here (as in schedualerFCFS)
+
+
+        // Find the process with minimal <mean_ticks>
+        for(p = proc; p < &proc[NPROC]; p++) {
+          acquire(&p->lock);
+          if(p->mean_ticks < min && p->state == RUNNABLE) {
+            min = p->mean_ticks;
+          }
+          release(&p->lock);
+        }
+
+        for(p = proc; p < &proc[NPROC]; p++) {
+          acquire(&p->lock);
+          if(p->mean_ticks == min && p->state == RUNNABLE) {
+            release(&p->lock);
+            acquire(&tickslock);
+            ticks0 = ticks;
+            release(&tickslock);
+            acquire(&p->lock);
+            latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
+            p->runnable_time += latest_runnable_time_burst;
+            p->state = RUNNING;
+            c->proc = p;
+
+            swtch(&c->context, &p->context);
+
+            acquire(&tickslock);
+            p->last_ticks = ticks- ticks0; // CPU burst
+            //printf("\n***PROC.C:lastTicks:%d\n",p->last_ticks); // Omri added - for debug
+            release(&tickslock);
+
+            p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * rate) / 10;
+            //printf("***meanTicks:%d\n",p->mean_ticks);// Omri added - for debug
+            c->proc = 0;
+            release(&p->lock);
+            break;
+          }
+          release(&p->lock);
+        }
+            }
+        else
+        {
+            //release(&myproc()->lock);
+            release(&pause_flag_lock);
+            release(&pause_time_lock);
+            acquire(&tickslock);
+            currTime= ticks;
+            release(&tickslock);
+        }
       }
-      release(&p->lock);
-    }
-
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->mean_ticks == min && p->state == RUNNABLE) {
-        release(&p->lock);
-        acquire(&tickslock);
-        ticks0 = ticks;
-        release(&tickslock);
-        acquire(&p->lock);
-        latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
-        p->runnable_time += latest_runnable_time_burst;
-        p->state = RUNNING;
-        c->proc = p;
-
-        swtch(&c->context, &p->context);
-        
-        acquire(&tickslock);
-        p->last_ticks = ticks- ticks0; // CPU burst
-        //printf("\n***PROC.C:lastTicks:%d\n",p->last_ticks); // Omri added - for debug
-        release(&tickslock);
-
-        p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * rate) / 10;
-        //printf("***meanTicks:%d\n",p->mean_ticks);// Omri added - for debug
-        c->proc = 0;
-        release(&p->lock);
-        break;
-      }
-      release(&p->lock);
-    }
-  }
 }
 
 
@@ -675,42 +675,61 @@ void schedulerFCFS(void){
   struct proc *p;
   struct cpu *c = mycpu();
   int min = __INT_MAX__;
-  int processesCount =  initPause(); // Number of processes
   uint ticks0, latest_runnable_time_burst;
   c->proc = 0;
 
+    acquire(&tickslock);
+    uint currTime= ticks;
+    release(&tickslock);
     for(;;){
-     intr_on();
-     checkAndPause(processesCount); // Check if <pause_system> was called, and pause accordingly
-     min = __INT_MAX__;
-     // Find the process with minimal <last_runnable_time>
-     for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);         
-      if(p->state == RUNNABLE && p->last_runnable_time < min) {
-        min = p->last_runnable_time;
-      }
-      release(&p->lock);
-     }
+        // Avoid deadlock by ensuring that devices can interrupt.
+        acquire(&pause_time_lock);
+        acquire(&pause_flag_lock);
 
-     for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);         
-      if(p->state == RUNNABLE && p->last_runnable_time == min) {
-        acquire(&tickslock);
-        ticks0 = ticks;
-        release(&tickslock);
-        latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
-        p->runnable_time += latest_runnable_time_burst;
-        p->last_time_state_changed = ticks0;
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-        c->proc = 0;    
-        release(&p->lock);
-        break;
-      }
-      release(&p->lock);
-     }
-  }
+        if(pause_flag==0 || currTime>=start_pause_time+pause_duration_time) {
+            pause_flag = 0;
+            release(&pause_flag_lock);
+            release(&pause_time_lock);
+
+            intr_on();
+         min = __INT_MAX__;
+         // Find the process with minimal <last_runnable_time>
+         for(p = proc; p < &proc[NPROC]; p++) {
+          acquire(&p->lock);
+          if(p->state == RUNNABLE && p->last_runnable_time < min) {
+            min = p->last_runnable_time;
+          }
+          release(&p->lock);
+         }
+
+         for(p = proc; p < &proc[NPROC]; p++) {
+          acquire(&p->lock);
+          if(p->state == RUNNABLE && p->last_runnable_time == min) {
+            acquire(&tickslock);
+            ticks0 = ticks;
+            release(&tickslock);
+            latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
+            p->runnable_time += latest_runnable_time_burst;
+            p->last_time_state_changed = ticks0;
+            p->state = RUNNING;
+            c->proc = p;
+            swtch(&c->context, &p->context);
+            c->proc = 0;
+            release(&p->lock);
+            break;
+          }
+          release(&p->lock);
+         }
+            }
+        else
+        {
+            release(&pause_flag_lock);
+            release(&pause_time_lock);
+            acquire(&tickslock);
+            currTime= ticks;
+            release(&tickslock);
+        }
+    }
 }
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -946,11 +965,15 @@ procdump(void)
 int
 pause_system(int seconds)
 {
-    struct  proc *  curr_proc = myproc();
-    acquire(&curr_proc->lock);
-    curr_proc->pause_left_time = seconds * 100;
-    curr_proc->should_pause = 1;
-    release(&curr_proc->lock);
+    acquire(&pause_time_lock);
+    acquire(&pause_flag_lock);
+    pause_flag = 1;
+    release(&pause_flag_lock);
+    pause_duration_time = seconds*20;
+    acquire(&tickslock);
+    start_pause_time = ticks;
+    release(&tickslock);
+    release(&pause_time_lock);
     yield();
     return 0;
 }
@@ -958,19 +981,14 @@ pause_system(int seconds)
 int
 kill_system(void)
 {
-  //Omri- I checked and the function is always gets into pid=0 -> we need to understand why
   struct proc *p;
   int curr_pid;
   for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      // if((p->pid > 3) || (p->pid < 1)){// init process pid is 1, shell process pids are 2,3 - from a print OMRI made in the "exit" function
-      //     p->killed = 1; 
-      // }
       curr_pid = p->pid;
       release(&p->lock);
 
-      if (curr_pid > 1) //TODO check 2 or 3
-      {
+      if (curr_pid > 1) {//TODO check 2 or 3
           kill(curr_pid);
       }
   }
@@ -984,7 +1002,7 @@ print_status(void)
 //  uint ticks0 = ticks;
 //  release(&tickslock);
   acquire(&myproc()->lock);
-//  if(myproc()->pid%6 == 0)
+//  if(myproc()->pid%6 == 0) // used to decrease the number of System Status printings
   printf("System Details:\nSleeping Processes Mean is %d\nRunnable Processes Mean is %d\nRunning Processes Mean is %d\nProgram Time is %d\nStart Time is %d\nCPU Utilization is %d\n********************\n\n",
   sleeping_processes_mean, runnable_processes_mean, running_processes_mean, program_time, start_time, cpu_utilization);
   //printf("Process pid %d Details:\nrunnableTime:%d\nsleepingTime:%d\nrunningTime:%d\nlast runnable time : %d\nlast_time_state_changed: %d\nlastTicks:%d\nmeanTicks:%d\n*******************\n\n",myproc()->pid,myproc()->runnable_time,myproc()->sleeping_time,myproc()->running_time,myproc()->last_time_state_changed ,myproc()->last_runnable_time,myproc()->last_ticks,myproc()->mean_ticks);//TODO:Remove me

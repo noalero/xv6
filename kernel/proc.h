@@ -95,8 +95,6 @@ struct proc {
   uint mean_ticks;               // SJF
   uint last_ticks;               // SJF: number of ticks in the last CPU burst
   uint last_runnable_time;       // FCFS: the ticks value of the last time the process became RUNNABLE
-  int should_pause;              // Omri added - a flag that tells whether the system should pause right now or not
-  int pause_left_time;           // Omri added - the time left that all system should be in pause state - in ticks units
   uint sleeping_time;            // Noa- Total time spent in SLEEPING state
   uint runnable_time;            // Noa- Total time spent in RUNNABLE state
   uint running_time;             // Noa- Total time spent in RUNNING state
