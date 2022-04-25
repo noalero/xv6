@@ -539,7 +539,6 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
-  printf("proc.c RR\n");
   struct proc *p;
   struct cpu *c = mycpu();
   uint ticks0, latest_runnable_time_burst;
@@ -570,10 +569,12 @@ scheduler(void)
                   latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
                   p->runnable_time += latest_runnable_time_burst;
                   p->last_time_state_changed = ticks0;
+
                   p->state = RUNNING;
                   c->proc = p;
                   swtch(&c->context, &p->context);
 
+                  p->running_time+=ticks-ticks0;
                   // Process is done running for now.
                   // It should have changed its p->state before coming back.
                   c->proc = 0;
@@ -594,7 +595,6 @@ scheduler(void)
 //The shell should get commands like in the RR scheduler?
 //How should we check this?
 void schedulerSJF(void){
-  printf("**********Entering SJF scheduler in proc.c file******\n");
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
@@ -627,7 +627,6 @@ void schedulerSJF(void){
           }
           release(&p->lock);
         }
-
         for(p = proc; p < &proc[NPROC]; p++) {
           acquire(&p->lock);
           if(p->mean_ticks == min && p->state == RUNNABLE) {
@@ -638,18 +637,17 @@ void schedulerSJF(void){
             acquire(&p->lock);
             latest_runnable_time_burst = ticks0 - p->last_time_state_changed;
             p->runnable_time += latest_runnable_time_burst;
+            p->last_time_state_changed = ticks0;
             p->state = RUNNING;
             c->proc = p;
 
             swtch(&c->context, &p->context);
 
-            acquire(&tickslock);
-            p->last_ticks = ticks- ticks0; // CPU burst
-            //printf("\n***PROC.C:lastTicks:%d\n",p->last_ticks); // Omri added - for debug
-            release(&tickslock);
+
+            p->last_ticks = ticks- ticks0; // CPU burst - cahnge to ticks*1000- ticks0*1000 for checking SJF
+            p->running_time+= p->last_ticks;
 
             p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * rate) / 10;
-            //printf("***meanTicks:%d\n",p->mean_ticks);// Omri added - for debug
             c->proc = 0;
             release(&p->lock);
             break;
@@ -659,7 +657,6 @@ void schedulerSJF(void){
             }
         else
         {
-            //release(&myproc()->lock);
             release(&pause_flag_lock);
             release(&pause_time_lock);
             acquire(&tickslock);
@@ -671,7 +668,6 @@ void schedulerSJF(void){
 
 
 void schedulerFCFS(void){
-  printf("********** Entering to FCFS scheduler *************\n");
   struct proc *p;
   struct cpu *c = mycpu();
   int min = __INT_MAX__;
@@ -714,6 +710,8 @@ void schedulerFCFS(void){
             p->state = RUNNING;
             c->proc = p;
             swtch(&c->context, &p->context);
+
+            p->running_time+= ticks-ticks0;
             c->proc = 0;
             release(&p->lock);
             break;
@@ -768,8 +766,8 @@ yield(void)
   acquire(&tickslock);
   ticks0 = ticks;
   release(&tickslock);
-  uint latest_running_time_burst = ticks0 - p->last_time_state_changed; // Only a process in <p->state == RUNNING> can yield
-  p->running_time += latest_running_time_burst;
+ // uint latest_running_time_burst = ticks0 - p->last_time_state_changed; // Only a process in <p->state == RUNNING> can yield
+  //p->running_time += latest_running_time_burst;
   p->last_time_state_changed = ticks0; // The <ticks> value of the time <p> entered <RUNNABLE> state
   p->last_runnable_time = ticks0; 
   p->state = RUNNABLE;  
@@ -966,13 +964,14 @@ int
 pause_system(int seconds)
 {
     acquire(&pause_time_lock);
+
     acquire(&pause_flag_lock);
     pause_flag = 1;
     release(&pause_flag_lock);
+
     pause_duration_time = seconds*20;
-    acquire(&tickslock);
     start_pause_time = ticks;
-    release(&tickslock);
+
     release(&pause_time_lock);
     yield();
     return 0;
@@ -998,14 +997,16 @@ kill_system(void)
 void
 print_status(void)
 {
-//  acquire(&tickslock);
-//  uint ticks0 = ticks;
-//  release(&tickslock);
-  acquire(&myproc()->lock);
-//  if(myproc()->pid%6 == 0) // used to decrease the number of System Status printings
+  //uint ticks0 = ticks;
+  //acquire(&myproc()->lock);
+  //if(myproc()->pid%6 == 0) // used to decrease the number of System Status printings
+
+
   printf("System Details:\nSleeping Processes Mean is %d\nRunnable Processes Mean is %d\nRunning Processes Mean is %d\nProgram Time is %d\nStart Time is %d\nCPU Utilization is %d\n********************\n\n",
   sleeping_processes_mean, runnable_processes_mean, running_processes_mean, program_time, start_time, cpu_utilization);
+
+
   //printf("Process pid %d Details:\nrunnableTime:%d\nsleepingTime:%d\nrunningTime:%d\nlast runnable time : %d\nlast_time_state_changed: %d\nlastTicks:%d\nmeanTicks:%d\n*******************\n\n",myproc()->pid,myproc()->runnable_time,myproc()->sleeping_time,myproc()->running_time,myproc()->last_time_state_changed ,myproc()->last_runnable_time,myproc()->last_ticks,myproc()->mean_ticks);//TODO:Remove me
-  //printf("Process num %d , last ticks:%d, mean ticks:%d\n",myproc()->pid,myproc()->last_ticks,myproc()->mean_ticks);
-  release(&myproc()->lock);
+  //printf("Process num %d , last ticks:%d, mean ticks:%d\n",myproc()->pid,myproc()->last_ticks,myproc()->mean_ticks);//TODO:remove me
+  //release(&myproc()->lock);
 }
