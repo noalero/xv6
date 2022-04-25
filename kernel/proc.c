@@ -543,9 +543,7 @@ scheduler(void)
   struct cpu *c = mycpu();
   uint ticks0, latest_runnable_time_burst;
   c->proc = 0;
-  acquire(&tickslock);
   uint currTime= ticks;
-  release(&tickslock);
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
       acquire(&pause_flag_lock);
